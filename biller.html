@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<title>Biller View</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; color: #333; display: flex; height: 100vh; }
+.sidebar { width: 200px; background-color: #2c3e50; color: white; padding-top: 20px; display: flex; flex-direction: column; flex-shrink: 0; }
+.main-content { flex-grow: 1; padding: 20px 40px; overflow-y: auto; }
+.sidebar-header { padding: 0 20px 20px 20px; font-size: 1.2em; font-weight: bold; border-bottom: 1px solid #34495e; }
+.sidebar-nav { flex-grow: 1; }
+.sidebar-nav button, .logout-btn { width: 100%; padding: 15px 20px; background: none; border: none; color: #bdc3c7; text-align: left; font-size: 1em; cursor: pointer; border-bottom: 1px solid #34495e; transition: background-color 0.2s, color 0.2s; }
+.sidebar-nav button:hover, .logout-btn:hover { background-color: #34495e; color: #ffffff; }
+.sidebar-nav button.active { background-color: #4267B2; color: #ffffff; font-weight: bold; }
+.logout-btn { border-top: 1px solid #34495e; border-bottom: none; }
+.content-section { display: none; }
+.content-section.visible { display: block; }
+.section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+h1, h2 { color: #1c1e21; padding-bottom: 10px; margin-bottom: 0; border: none; }
+table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+thead { background-color: #6c757d; color: white; }
+th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid #ddd; }
+tbody tr { cursor: pointer; transition: background-color 0.2s; }
+tbody tr:hover { background-color: #e9ebee; }
+.action-btn { padding: 6px 12px; margin: 0 5px 0 0; font-size: 14px; border-radius: 6px; border: none; cursor: pointer; color: white; }
+.modify-btn { background-color: #007bff; }
+.send-btn { background-color: #28a745; }
+.delete-btn { background-color: #dc3545; }
+/* NEW: See Pay button style */
+.seepay-btn { background-color: #4CAF50; }
+.seepay-btn:disabled { background-color: #a5d6a7; cursor: not-allowed; }
+.loader { text-align: center; padding: 20px; font-size: 1.2em; }
+.column-selector { position: relative; }
+.column-selector-btn { background-color: #f0f2f5; border: 1px solid #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+.column-dropdown { display: none; position: absolute; right: 0; top: 30px; background-color: white; border: 1px solid #ccc; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 4px; padding: 10px; z-index: 100; max-height: 400px; overflow-y: auto;}
+.column-dropdown.visible { display: block; }
+.column-dropdown div { padding: 5px; white-space: nowrap; }
+.column-dropdown label { margin-left: 5px; cursor: pointer; }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; display: none; justify-content: center; align-items: center; }
+.modal-content { background: #fff; padding: 20px 30px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; position: relative; }
+.modal-close-btn { position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 2.5em; line-height: 1; cursor: pointer; color: #888; }
+.modal-body { display: grid; grid-template-columns: 1fr 2fr; gap: 15px; margin-top: 15px; }
+.modal-body label { font-weight: bold; text-align: right; padding-top: 5px; }
+.modal-body input { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+.modal-actions { margin-top: 20px; text-align: right; }
+.header-controls { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+.pagination-controls { display: flex; align-items: center; gap: 10px; }
+.pagination-controls button { background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+.pagination-controls button:hover:not(:disabled) { background-color: #0056b3; }
+.pagination-controls button:disabled { background-color: #ccc; cursor: not-allowed; }
+.pagination-controls select { padding: 7px 10px; border-radius: 4px; border: 1px solid #ccc; }
+.pagination-info { font-size: 0.9em; color: #666; white-space: nowrap; }
+
+/* NEW: Styles for the "See Pay" modal content */
+.pay-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 15px;
+}
+.pay-box {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+}
+.pay-box-label {
+    font-size: 0.8em;
+    color: #666;
+    margin-bottom: 5px;
+}
+.pay-box-value {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+}
+.pay-box.approved {
+    background-color: #e8f5e9;
+    border-color: #4CAF50;
+}
+.pay-box.pending {
+    background-color: #fff3e0;
+    border-color: #FFC107;
+}
+.pay-box.rejected {
+    background-color: #ffebee;
+    border-color: #F44336;
+}
+.pay-remarks {
+    grid-column: 1 / -1;
+    margin-top: 15px;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+}
+.pay-remarks-label {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+.pay-remarks-text {
+    color: #555;
+    font-size: 0.9em;
+    white-space: pre-wrap; /* Preserve new lines */
+}
+</style>
+</head>
+<body>
+<div class="sidebar">
+<div class="sidebar-header">Biller View</div>
+<div class="sidebar-nav">
+<button id="nav-pending" onclick="showSection('pending')">Pending</button>
+<button id="nav-sent" onclick="showSection('sent')">Sent for Approval</button>
+<button id="nav-deleted" onclick="showSection('deleted')">Deleted</button>
+</div>
+<button class="logout-btn" onclick="logoutUser()">Logout</button>
+</div>
+<div class="main-content">
+<h1 id="welcome-message">Biller Dashboard</h1>
+<div id="pending-section" class="content-section">
+<div class="section-header">
+<h2>Pending Drafts</h2>
+<div class="header-controls">
+<div class="column-selector" id="pending-selector"></div>
+<div id="pending-pagination" class="pagination-controls" style="display:none;"></div>
+</div>
+</div>
+<div id="pending-loader" class="loader">Loading...</div>
+<table id="pending-table" style="display:none;"><thead></thead><tbody></tbody></table>
+<p id="no-pending" style="display:none;">No pending drafts.</p>
+</div>
+<div id="sent-section" class="content-section">
+<div class="section-header">
+<h2>Sent for Approval</h2>
+<div class="header-controls">
+<div class="column-selector" id="sent-selector"></div>
+<div id="sent-pagination" class="pagination-controls" style="display:none;"></div>
+</div>
+</div>
+<div id="sent-loader" class="loader">Loading...</div>
+<table id="sent-table" style="display:none;"><thead></thead><tbody></tbody></table>
+<p id="no-sent" style="display:none;">No entries found.</p>
+</div>
+<div id="deleted-section" class="content-section">
+<div class="section-header">
+<h2>Deleted</h2>
+<div class="header-controls">
+<div class="column-selector" id="deleted-selector"></div>
+<div id="deleted-pagination" class="pagination-controls" style="display:none;"></div>
+</div>
+</div>
+<div id="deleted-loader" class="loader">Loading...</div>
+<table id="deleted-table" style="display:none;"><thead></thead><tbody></tbody></table>
+<p id="no-deleted" style="display:none;">No deleted entries.</p>
+</div>
+</div>
+
+<div id="modify-modal" class="modal-overlay">
+<div class="modal-content">
+<button class="modal-close-btn" onclick="closeModal('modify-modal')">&times;</button>
+<h2 id="modal-title">View / Modify Entry</h2>
+<form id="modify-form">
+<div id="modal-body" class="modal-body"></div>
+<div id="modal-actions" class="modal-actions">
+<button type="button" class="action-btn" style="background-color:#6c757d;" onclick="closeModal('modify-modal')">Cancel</button>
+<button type="submit" class="action-btn" style="background-color:#007bff;">Save Changes</button>
+</div>
+</form>
+</div>
+</div>
+
+<div id="pay-modal" class="modal-overlay">
+<div class="modal-content" style="max-width: 800px;">
+<button class="modal-close-btn" onclick="closeModal('pay-modal')">&times;</button>
+<h2 id="pay-modal-title">Payment Details</h2>
+<div id="pay-modal-body">
+<p id="pay-loader" class="loader">Loading payment details...</p>
+</div>
+</div>
+</div>
+
+<script>
+// =================================================================================
+// IMPORTANT: APNE DEPLOYED GOOGLE APPS SCRIPT KA URL YAHAN BHI PASTE KAREIN
+// =================================================================================
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJUyYMUqE29p594h6WHnh7OIuiw7g69J3OdTaJRrN9wYTDv3OQPQeGIdE6HDkItQLy7A/exec";
+
+let loadedData = {};
+let draftHeaders = [];
+let approvalHeaders = [];
+const DEFAULT_COLS_DRAFT = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable'];
+const DEFAULT_COLS_SENT = ['Unique ID', 'Vendor', 'FinalAmountPayable', 'AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
+
+// Pagination state
+const paginationState = {
+  pending: { currentPage: 1, entriesPerPage: 20 },
+  sent: { currentPage: 1, entriesPerPage: 20 },
+  deleted: { currentPage: 1, entriesPerPage: 20 },
+};
+const ENTRIES_PER_PAGE_OPTIONS = [20, 30, 50, 100, 200];
+
+// --- NEW: Helper function to call the backend API ---
+async function callAppsScript(functionName, params = []) {
+  const requestData = { action: functionName, params: params };
+  try {
+    const response = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(requestData),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+    });
+    if (!response.ok) {
+      throw new Error(`Network response was not ok: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error calling Apps Script:", error);
+    return { success: false, message: error.message };
+  }
+}
+
+// --- MODIFIED and NEW Functions ---
+document.addEventListener("DOMContentLoaded", () => {
+  const currentUser = localStorage.getItem('approvalName');
+  if (!currentUser) {
+    window.location.href = 'index.html';
+    return;
+  }
+  document.getElementById('welcome-message').textContent += ` (Welcome, ${currentUser})`;
+  window.addEventListener('click', (e) => {
+    document.querySelectorAll('.column-dropdown').forEach(d => d.classList.remove('visible'));
+  });
+  fetchAndRenderData();
+  showSection('pending');
+});
+
+function logoutUser() {
+  localStorage.clear();
+  window.location.href = 'index.html';
+}
+
+async function fetchAndRenderData() {
+  showLoader();
+  const data = await callAppsScript('getBillerData');
+  if (data.success) {
+    loadedData = data;
+    draftHeaders = data.draftHeaders;
+    approvalHeaders = data.approvalHeaders;
+    initializeColumnSelectors();
+    renderTable('pending', data.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
+    renderTable('sent', data.sent, paginationState.sent.currentPage, paginationState.sent.entriesPerPage);
+    renderTable('deleted', data.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
+  } else {
+    alert('Failed to load data: ' + data.message);
+    ['pending','sent','deleted'].forEach(type => document.getElementById(`${type}-loader`).style.display = 'none');
+  }
+}
+
+async function updateStatus(uniqueId, status) {
+  const action = status === 'sent' ? 'send for approval' : 'delete';
+  if (confirm(`Are you sure you want to ${action} this entry?`)) {
+    showLoader();
+    const response = await callAppsScript('updateBillerStatus', [uniqueId, status]);
+    if (response.success) {
+      fetchAndRenderData();
+    } else {
+      alert('Error: ' + response.message);
+    }
+  }
+}
+
+document.getElementById('modify-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const updatedEntry = Object.fromEntries(new FormData(e.target).entries());
+  closeModal('modify-modal');
+  showLoader();
+  const response = await callAppsScript('updateBillerEntry', [updatedEntry]);
+  if (response.success) {
+    fetchAndRenderData();
+  } else {
+    alert('Error updating: ' + response.message);
+  }
+});
+
+// --- UNCHANGED HELPER FUNCTIONS ---
+function openModal(modalId) {
+  document.getElementById(modalId).style.display = 'flex';
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).style.display = 'none';
+}
+
+function showSection(sectionName) {
+  document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('visible'));
+  document.querySelectorAll('.sidebar-nav button').forEach(btn => btn.classList.remove('active'));
+  document.getElementById(sectionName + '-section').classList.add('visible');
+  document.getElementById('nav-' + sectionName).classList.add('active');
+}
+
+function renderTable(tableType, data, currentPage, entriesPerPage) {
+  const table = document.getElementById(`${tableType}-table`);
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('tbody');
+  const paginationContainer = document.getElementById(`${tableType}-pagination`);
+
+  thead.innerHTML = '';
+  tbody.innerHTML = '';
+  paginationContainer.innerHTML = '';
+
+  document.getElementById(`${tableType}-loader`).style.display = 'none';
+  const isDraftTable = tableType === 'pending' || tableType === 'deleted';
+  const headersToUse = isDraftTable ? draftHeaders : approvalHeaders;
+  const defaultCols = isDraftTable ? DEFAULT_COLS_DRAFT : DEFAULT_COLS_SENT;
+  const storageKey = `biller-${tableType}-cols`;
+  let visibleCols = JSON.parse(localStorage.getItem(storageKey)) || defaultCols;
+
+  if (!data || data.length === 0) {
+    document.getElementById(`no-${tableType}`).style.display = 'block';
+    table.style.display = 'none';
+    paginationContainer.style.display = 'none';
+    return;
+  }
+  document.getElementById(`no-${tableType}`).style.display = 'none';
+  table.style.display = 'table';
+  paginationContainer.style.display = 'flex';
+
+  const totalEntries = data.length;
+  const totalPages = Math.ceil(totalEntries / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = Math.min(startIndex + entriesPerPage, totalEntries);
+  const paginatedData = data.slice(startIndex, endIndex);
+
+  // Render table headers
+  const headerRow = document.createElement('tr');
+  let headerHtml = visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
+  if (tableType === 'pending' || tableType === 'sent') headerHtml += '<th>Actions</th>';
+  headerRow.innerHTML = headerHtml;
+  thead.appendChild(headerRow);
+
+  // Render table rows
+  paginatedData.forEach(entry => {
+    const uniqueId = entry['Unique ID'];
+    const row = document.createElement('tr');
+    row.onclick = () => openModifyModal(uniqueId, tableType === 'pending');
+    
+    let rowHtml = visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
+    
+    // Action buttons for 'pending' table
+    if (tableType === 'pending') {
+      rowHtml += `<td onclick="event.stopPropagation()">
+        <button class="action-btn modify-btn" onclick="openModifyModal('${uniqueId}', true)">Modify</button>
+        <button class="action-btn send-btn" onclick="updateStatus('${uniqueId}', 'sent')">Send</button>
+        <button class="action-btn delete-btn" onclick="updateStatus('${uniqueId}', 'Delete')">Delete</button>
+      </td>`;
+    } 
+    // Action buttons for 'sent' table
+    else if (tableType === 'sent') {
+      const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
+      const isApproved = finalStatus === 'approved';
+      
+      rowHtml += `<td onclick="event.stopPropagation()">
+        <button class="action-btn seepay-btn" onclick="openPayModal('${uniqueId}')" ${isApproved ? '' : 'disabled'}>See Pay</button>
+      </td>`;
+    }
+
+    row.innerHTML = rowHtml;
+    tbody.appendChild(row);
+  });
+
+  // Render pagination controls
+  const prevButton = document.createElement('button');
+  prevButton.textContent = 'Previous';
+  prevButton.disabled = currentPage === 1;
+  prevButton.onclick = () => changePage(tableType, currentPage - 1);
+  paginationContainer.appendChild(prevButton);
+
+  const pageInfo = document.createElement('span');
+  pageInfo.className = 'pagination-info';
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${totalEntries} entries)`;
+  paginationContainer.appendChild(pageInfo);
+
+  const nextButton = document.createElement('button');
+  nextButton.textContent = 'Next';
+  nextButton.disabled = currentPage === totalPages;
+  nextButton.onclick = () => changePage(tableType, currentPage + 1);
+  paginationContainer.appendChild(nextButton);
+
+  const perPageSelect = document.createElement('select');
+  ENTRIES_PER_PAGE_OPTIONS.forEach(option => {
+    const opt = document.createElement('option');
+    opt.value = option;
+    opt.textContent = `${option} per page`;
+    if (option === entriesPerPage) opt.selected = true;
+    perPageSelect.appendChild(opt);
+  });
+  perPageSelect.onchange = (e) => changeEntriesPerPage(tableType, parseInt(e.target.value));
+  paginationContainer.appendChild(perPageSelect);
+}
+
+function changePage(tableType, newPage) {
+  paginationState[tableType].currentPage = newPage;
+  renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+}
+
+function changeEntriesPerPage(tableType, newEntriesPerPage) {
+  paginationState[tableType].entriesPerPage = newEntriesPerPage;
+  paginationState[tableType].currentPage = 1;
+  renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+}
+
+function initializeColumnSelectors() {
+  ['pending', 'sent', 'deleted'].forEach(tableType => {
+    const selectorContainer = document.getElementById(`${tableType}-selector`);
+    const isDraftTable = tableType === 'pending' || tableType === 'deleted';
+    const headersToUse = isDraftTable ? draftHeaders : approvalHeaders;
+    const defaultCols = isDraftTable ? DEFAULT_COLS_DRAFT : DEFAULT_COLS_SENT;
+    const storageKey = `biller-${tableType}-cols`;
+    const btn = document.createElement('button');
+    btn.className = 'column-selector-btn';
+    btn.textContent = 'Select Columns';
+    const dropdown = document.createElement('div');
+    dropdown.className = 'column-dropdown';
+    let visibleCols = JSON.parse(localStorage.getItem(storageKey)) || defaultCols;
+    headersToUse.forEach(header => {
+      const optionDiv = document.createElement('div');
+      optionDiv.innerHTML = `<input type="checkbox" id="${tableType}-${header}" value="${header}" ${visibleCols.includes(header) ? 'checked' : ''}><label for="${tableType}-${header}">${header}</label>`;
+      optionDiv.querySelector('input').addEventListener('change', () => {
+        const newCols = Array.from(dropdown.querySelectorAll('input:checked')).map(cb => cb.value);
+        localStorage.setItem(storageKey, JSON.stringify(newCols));
+        renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+      });
+      dropdown.appendChild(optionDiv);
+    });
+    selectorContainer.innerHTML = '';
+    selectorContainer.appendChild(btn);
+    selectorContainer.appendChild(dropdown);
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      dropdown.classList.toggle('visible');
+    });
+  });
+}
+
+function openModifyModal(uniqueId, isEditable) {
+  const dataSource = isEditable ? [...loadedData.pending, ...loadedData.deleted] : loadedData.sent;
+  const entry = dataSource.find(e => e['Unique ID'] === uniqueId);
+  if (!entry) {
+    alert("Entry not found.");
+    return;
+  }
+  const modalBody = document.getElementById('modal-body');
+  modalBody.innerHTML = '';
+  document.getElementById('modal-title').textContent = isEditable ? 'Modify Entry' : 'View Sent Entry';
+  document.getElementById('modal-actions').style.display = isEditable ? 'block' : 'none';
+  const headersForModal = isEditable ? draftHeaders : approvalHeaders;
+  headersForModal.forEach(header => {
+    const isFieldReadOnly = !isEditable || header === 'Unique ID';
+    const value = entry[header] || '';
+    modalBody.innerHTML += `<label for="modal-${header}">${header}</label><input type="text" id="modal-${header}" name="${header}" value="${value}" ${isFieldReadOnly ? 'readonly' : ''} style="${isFieldReadOnly ? 'background-color:#e9ecef;' : ''}">`;
+  });
+  openModal('modify-modal');
+}
+
+// NEW: Function to open the 'See Pay' modal and fetch data
+async function openPayModal(uniqueId) {
+    openModal('pay-modal');
+    document.getElementById('pay-loader').style.display = 'block';
+    const modalBody = document.getElementById('pay-modal-body');
+    
+    // Fetch the single entry data from the approval sheet
+    const response = await callAppsScript('getSingleEntry', [uniqueId]);
+
+    if (!response.success || !response.entry) {
+        modalBody.innerHTML = `<p class="loader" style="color:red;">Error fetching data: ${response.message || 'Entry not found.'}</p>`;
+        return;
+    }
+    document.getElementById('pay-loader').style.display = 'none';
+
+    const entry = response.entry;
+    
+    // Render the data in the "image" format
+    modalBody.innerHTML = `
+        <h3 style="margin-top: 0;">${entry['Company N']}</h3>
+        <p><b>Vendor:</b> ${entry['Vendor Name']}</p>
+        <p><b>Invoice Date:</b> ${entry['InvoiceDate']}</p>
+        <p><b>Invoice No.:</b> ${entry['InvoiceNumber']}</p>
+        <hr/>
+        
+        <div class="pay-grid">
+            <div class="pay-box approved">
+                <div class="pay-box-label">Sum of Taxable Value</div>
+                <div class="pay-box-value">${entry['Sum of Taxable Value']}</div>
+            </div>
+            <div class="pay-box approved">
+                <div class="pay-box-label">Sum of TDS Payable</div>
+                <div class="pay-box-value">${entry['Sum of TDS Payable']}</div>
+            </div>
+            <div class="pay-box approved">
+                <div class="pay-box-label">Sum of Net Payable</div>
+                <div class="pay-box-value">${entry['Sum of Net Payable']}</div>
+            </div>
+            <div class="pay-remarks">
+                <div class="pay-remarks-label">Final Approval Status</div>
+                <div class="pay-remarks-text" style="color:green; font-weight:bold;">${entry['Final Approval Status'] || 'N/A'}</div>
+            </div>
+            <div class="pay-remarks">
+                <div class="pay-remarks-label">Final Approval Remarks</div>
+                <div class="pay-remarks-text">${entry['Final Approval Remarks'] || 'No remarks.'}</div>
+            </div>
+        </div>
+        <div style="margin-top: 20px; text-align: right;">
+            <p><b>Final Amount Payable:</b> ${entry['FinalAmountPayable']}</p>
+        </div>
+    `;
+}
+
+function showLoader() {
+  ['pending','sent','deleted'].forEach(type => {
+    document.getElementById(`${type}-loader`).style.display = 'block';
+    document.getElementById(`${type}-table`).style.display = 'none';
+    document.getElementById(`no-${type}`).style.display = 'none';
+    document.getElementById(`${type}-pagination`).style.display = 'none';
+  });
+}
+</script>
+</body>
+</html>
