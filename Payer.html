@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <title>Payer View</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; color: #333; display: flex; height: 100vh; }
+        .sidebar { width: 200px; background-color: #2c3e50; color: white; padding-top: 20px; display: flex; flex-direction: column; flex-shrink: 0; }
+        .main-content { flex-grow: 1; padding: 20px 40px; overflow-y: auto; }
+        .sidebar-header { padding: 0 20px 20px 20px; font-size: 1.2em; font-weight: bold; border-bottom: 1px solid #34495e; }
+        .sidebar-nav { flex-grow: 1; }
+        .sidebar-nav button, .logout-btn { width: 100%; padding: 15px 20px; background: none; border: none; color: #bdc3c7; text-align: left; font-size: 1em; cursor: pointer; border-bottom: 1px solid #34495e; transition: background-color 0.2s, color 0.2s; }
+        .sidebar-nav button:hover, .logout-btn:hover { background-color: #34495e; color: #ffffff; }
+        .sidebar-nav button.active { background-color: #4267B2; color: #ffffff; font-weight: bold; }
+        .logout-btn { border-top: 1px solid #34495e; border-bottom: none; }
+        .content-section { display: none; }
+        .content-section.visible { display: block; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+        h1, h2 { color: #1c1e21; padding-bottom: 10px; margin-bottom: 0; border: none; }
+        table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+        thead { background-color: #6c757d; color: white; }
+        th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid #ddd; }
+        tbody tr { cursor: pointer; transition: background-color 0.2s; }
+        tbody tr:hover { background-color: #e9ebee; }
+        .action-btn { padding: 6px 12px; margin: 0 5px 0 0; font-size: 14px; border-radius: 6px; border: none; cursor: pointer; color: white; }
+        .complete-btn { background-color: #28a745; }
+        .reject-btn { background-color: #dc3545; }
+        .hold-btn { background-color: #ffc107; }
+        .loader { text-align: center; padding: 20px; font-size: 1.2em; }
+        .column-selector { position: relative; }
+        .column-selector-btn { background-color: #f0f2f5; border: 1px solid #ccc; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        .column-dropdown { display: none; position: absolute; right: 0; top: 30px; background-color: white; border: 1px solid #ccc; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-radius: 4px; padding: 10px; z-index: 100; max-height: 400px; overflow-y: auto;}
+        .column-dropdown.visible { display: block; }
+        .column-dropdown div { padding: 5px; white-space: nowrap; }
+        .column-dropdown label { margin-left: 5px; cursor: pointer; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-content { background: #fff; padding: 20px 30px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; position: relative; }
+        .modal-close-btn { position: absolute; top: 10px; right: 15px; background: none; border: none; font-size: 2.5em; line-height: 1; cursor: pointer; color: #888; }
+        .pay-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .pay-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 6px; padding: 10px; text-align: center; }
+        .pay-box-label { font-size: 0.8em; color: #666; margin-bottom: 5px; }
+        .pay-box-value { font-size: 1.2em; font-weight: bold; color: #333; }
+        .pay-remarks { grid-column: 1 / -1; margin-top: 15px; padding: 15px; border: 1px solid #ccc; border-radius: 6px; }
+        .pay-remarks-label { font-weight: bold; margin-bottom: 5px; }
+        .pay-remarks-text { color: #555; font-size: 0.9em; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">Payer View</div>
+    <div class="sidebar-nav">
+        <button id="nav-pending" onclick="showSection('pending')">Pending</button>
+        <button id="nav-paid" onclick="showSection('paid')">Paid</button>
+        <button id="nav-rejected" onclick="showSection('rejected')">Rejected</button>
+        <button id="nav-hold" onclick="showSection('hold')">Hold</button>
+    </div>
+    <button class="logout-btn" onclick="logoutUser()">Logout</button>
+</div>
+
+<div class="main-content">
+    <h1 id="welcome-message">Payer Dashboard</h1>
+
+    <div id="pending-section" class="content-section">
+        <div class="section-header">
+            <h2>Pending Payments</h2>
+        </div>
+        <div id="pending-loader" class="loader">Loading...</div>
+        <table id="pending-table" style="display:none;"><thead></thead><tbody></tbody></table>
+        <p id="no-pending" style="display:none;">No pending payments.</p>
+    </div>
+
+    <div id="paid-section" class="content-section">
+        <div class="section-header">
+            <h2>Paid Entries</h2>
+        </div>
+        <div id="paid-loader" class="loader">Loading...</div>
+        <table id="paid-table" style="display:none;"><thead></thead><tbody></tbody></table>
+        <p id="no-paid" style="display:none;">No paid entries.</p>
+    </div>
+
+    <div id="rejected-section" class="content-section">
+        <div class="section-header">
+            <h2>Rejected Entries</h2>
+        </div>
+        <div id="rejected-loader" class="loader">Loading...</div>
+        <table id="rejected-table" style="display:none;"><thead></thead><tbody></tbody></table>
+        <p id="no-rejected" style="display:none;">No rejected entries.</p>
+    </div>
+
+    <div id="hold-section" class="content-section">
+        <div class="section-header">
+            <h2>On Hold Entries</h2>
+        </div>
+        <div id="hold-loader" class="loader">Loading...</div>
+        <table id="hold-table" style="display:none;"><thead></thead><tbody></tbody></table>
+        <p id="no-hold" style="display:none;">No entries on hold.</p>
+    </div>
+
+</div>
+
+<div id="pay-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 800px;">
+        <button class="modal-close-btn" onclick="closeModal('pay-modal')">&times;</button>
+        <h2 id="pay-modal-title">Payment Details</h2>
+        <div id="pay-modal-body">
+            <p id="pay-loader" class="loader">Loading payment details...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJUyYMUqE29p594h6WHnh7OIuiw7g69J3OdTaJRrN9wYTDv3OQPQeGIdE6HDkItQLy7A/exec";
+    const PAYER_HEADERS = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status'];
+    let loadedData = {};
+
+    async function callAppsScript(functionName, params = []) {
+        const requestData = { action: functionName, params: params };
+        try {
+            const response = await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify(requestData),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+            });
+            if (!response.ok) {
+                throw new Error(`Network response was not ok: ${response.statusText}`);
+            }
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error("Error calling Apps Script:", error);
+            return { success: false, message: error.message };
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const currentUser = localStorage.getItem('approvalName');
+        const userType = localStorage.getItem('approvalType');
+        
+        if (userType !== 'Payer') {
+            window.location.href = 'index.html';
+            return;
+        }
+        document.getElementById('welcome-message').textContent += ` (Welcome, ${currentUser})`;
+        fetchAndRenderData();
+        showSection('pending');
+    });
+
+    function logoutUser() {
+        localStorage.clear();
+        window.location.href = 'index.html';
+    }
+
+    async function fetchAndRenderData() {
+        showLoader();
+        const pendingResponse = await callAppsScript('getPayDataByStatus', ['Pending']);
+        const paidResponse = await callAppsScript('getPayDataByStatus', ['Completed']);
+        const rejectedResponse = await callAppsScript('getPayDataByStatus', ['Rejected']);
+        const holdResponse = await callAppsScript('getPayDataByStatus', ['Hold']);
+
+        if (pendingResponse.success && paidResponse.success && rejectedResponse.success && holdResponse.success) {
+            loadedData.pending = pendingResponse.data;
+            loadedData.paid = paidResponse.data;
+            loadedData.rejected = rejectedResponse.data;
+            loadedData.hold = holdResponse.data;
+
+            renderTable('pending', loadedData.pending);
+            renderTable('paid', loadedData.paid);
+            renderTable('rejected', loadedData.rejected);
+            renderTable('hold', loadedData.hold);
+        } else {
+            alert('Failed to load data.');
+            showLoader(false); // Hide all loaders
+        }
+    }
+
+    async function updatePayStatus(uniqueId, newStatus) {
+        if (confirm(`Are you sure you want to change the status to '${newStatus}'?`)) {
+            showLoader();
+            const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus]);
+            if (response.success) {
+                alert(response.message);
+                fetchAndRenderData();
+            } else {
+                alert("Error: " + response.message);
+                showLoader(false);
+            }
+        }
+    }
+
+    function showSection(sectionName) {
+        document.querySelectorAll('.content-section').forEach(sec => sec.style.display = 'none');
+        document.querySelectorAll('.sidebar-nav button').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(sectionName + '-section').style.display = 'block';
+        document.getElementById('nav-' + sectionName).classList.add('active');
+    }
+
+    function renderTable(tableType, data) {
+        const table = document.getElementById(`${tableType}-table`);
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        document.getElementById(`${tableType}-loader`).style.display = 'none';
+
+        if (!data || data.length === 0) {
+            document.getElementById(`no-${tableType}`).style.display = 'block';
+            table.style.display = 'none';
+            return;
+        }
+
+        document.getElementById(`no-${tableType}`).style.display = 'none';
+        table.style.display = 'table';
+
+        const headerRow = document.createElement('tr');
+        const visibleHeaders = PAYER_HEADERS;
+        let headerHtml = visibleHeaders.map(h => `<th>${h}</th>`).join('');
+        if (tableType === 'pending') {
+            headerHtml += '<th>Actions</th>';
+        }
+        headerRow.innerHTML = headerHtml;
+        thead.appendChild(headerRow);
+
+        data.forEach(entry => {
+            const uniqueId = entry['Unique ID'];
+            const row = document.createElement('tr');
+            row.onclick = () => openPayModal(uniqueId);
+            
+            let rowHtml = visibleHeaders.map(h => `<td>${entry[h] || ''}</td>`).join('');
+            
+            if (tableType === 'pending') {
+                rowHtml += `<td onclick="event.stopPropagation()">
+                    <button class="action-btn complete-btn" onclick="updatePayStatus('${uniqueId}', 'Completed')">Complete</button>
+                    <button class="action-btn reject-btn" onclick="updatePayStatus('${uniqueId}', 'Rejected')">Reject</button>
+                    <button class="action-btn hold-btn" onclick="updatePayStatus('${uniqueId}', 'Hold')">Hold</button>
+                </td>`;
+            }
+            row.innerHTML = rowHtml;
+            tbody.appendChild(row);
+        });
+    }
+
+    function openModal(modalId) {
+        document.getElementById(modalId).style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+
+    async function openPayModal(uniqueId) {
+        openModal('pay-modal');
+        document.getElementById('pay-loader').style.display = 'block';
+        const modalBody = document.getElementById('pay-modal-body');
+        
+        const response = await callAppsScript('getSingleEntry', [uniqueId]);
+
+        if (!response.success || !response.entry) {
+            modalBody.innerHTML = `<p class="loader" style="color:red;">Error fetching data: ${response.message || 'Entry not found.'}</p>`;
+            return;
+        }
+        document.getElementById('pay-loader').style.display = 'none';
+
+        const entry = response.entry;
+        
+        modalBody.innerHTML = `
+            <h3 style="margin-top: 0;">${entry['Company N'] || 'N/A'}</h3>
+            <p><b>Vendor:</b> ${entry['Vendor Name'] || 'N/A'}</p>
+            <p><b>Invoice Date:</b> ${entry['InvoiceDate'] || 'N/A'}</p>
+            <p><b>Invoice No.:</b> ${entry['InvoiceNumber'] || 'N/A'}</p>
+            <hr/>
+            
+            <div class="pay-grid">
+                <div class="pay-box">
+                    <div class="pay-box-label">Sum of Taxable Value</div>
+                    <div class="pay-box-value">${entry['Sum of Taxable Value'] || 'N/A'}</div>
+                </div>
+                <div class="pay-box">
+                    <div class="pay-box-label">Sum of TDS Payable</div>
+                    <div class="pay-box-value">${entry['Sum of TDS Payable'] || 'N/A'}</div>
+                </div>
+                <div class="pay-box">
+                    <div class="pay-box-label">Sum of Net Payable</div>
+                    <div class="pay-box-value">${entry['Sum of Net Payable'] || 'N/A'}</div>
+                </div>
+                <div class="pay-remarks">
+                    <div class="pay-remarks-label">Final Approval Status</div>
+                    <div class="pay-remarks-text" style="color:green; font-weight:bold;">${entry['Final Approval Status'] || 'N/A'}</div>
+                </div>
+                <div class="pay-remarks">
+                    <div class="pay-remarks-label">Final Approval Remarks</div>
+                    <div class="pay-remarks-text">${entry['Final Approval Remarks'] || 'No remarks.'}</div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <p><b>Final Amount Payable:</b> ${entry['FinalAmountPayable'] || 'N/A'}</p>
+            </div>
+        `;
+    }
+
+    function showLoader(isVisible = true) {
+        const loaderStyle = isVisible ? 'block' : 'none';
+        const tableStyle = isVisible ? 'none' : 'table';
+        const noDataStyle = isVisible ? 'none' : 'block';
+
+        ['pending', 'paid', 'rejected', 'hold'].forEach(type => {
+            document.getElementById(`${type}-loader`).style.display = loaderStyle;
+            if (isVisible) {
+                document.getElementById(`${type}-table`).style.display = tableStyle;
+                document.getElementById(`no-${type}`).style.display = noDataStyle;
+            }
+        });
+    }
+
+</script>
+</body>
+</html>
