@@ -26,7 +26,6 @@ tbody tr:hover { background-color: #e9ebee; }
 .modify-btn { background-color: #007bff; }
 .send-btn { background-color: #28a745; }
 .delete-btn { background-color: #dc3545; }
-/* NEW: See Pay button style */
 .seepay-btn { background-color: #4CAF50; }
 .seepay-btn:disabled { background-color: #a5d6a7; cursor: not-allowed; }
 .loader { text-align: center; padding: 20px; font-size: 1.2em; }
@@ -51,7 +50,6 @@ tbody tr:hover { background-color: #e9ebee; }
 .pagination-controls select { padding: 7px 10px; border-radius: 4px; border: 1px solid #ccc; }
 .pagination-info { font-size: 0.9em; color: #666; white-space: nowrap; }
 
-/* NEW: Styles for the "See Pay" modal content */
 .pay-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -101,7 +99,7 @@ tbody tr:hover { background-color: #e9ebee; }
 .pay-remarks-text {
     color: #555;
     font-size: 0.9em;
-    white-space: pre-wrap; /* Preserve new lines */
+    white-space: pre-wrap;
 }
 </style>
 </head>
@@ -112,6 +110,7 @@ tbody tr:hover { background-color: #e9ebee; }
 <button id="nav-pending" onclick="showSection('pending')">Pending</button>
 <button id="nav-sent" onclick="showSection('sent')">Sent for Approval</button>
 <button id="nav-deleted" onclick="showSection('deleted')">Deleted</button>
+<button id="nav-approved" onclick="showSection('approved')">See Pay</button>
 </div>
 <button class="logout-btn" onclick="logoutUser()">Logout</button>
 </div>
@@ -153,6 +152,18 @@ tbody tr:hover { background-color: #e9ebee; }
 <table id="deleted-table" style="display:none;"><thead></thead><tbody></tbody></table>
 <p id="no-deleted" style="display:none;">No deleted entries.</p>
 </div>
+<div id="approved-section" class="content-section">
+<div class="section-header">
+<h2>Paid Entries (All Approved)</h2>
+<div class="header-controls">
+<div class="column-selector" id="approved-selector"></div>
+<div id="approved-pagination" class="pagination-controls" style="display:none;"></div>
+</div>
+</div>
+<div id="approved-loader" class="loader">Loading...</div>
+<table id="approved-table" style="display:none;"><thead></thead><tbody></tbody></table>
+<p id="no-approved" style="display:none;">No paid entries found.</p>
+</div>
 </div>
 
 <div id="modify-modal" class="modal-overlay">
@@ -180,9 +191,6 @@ tbody tr:hover { background-color: #e9ebee; }
 </div>
 
 <script>
-// =================================================================================
-// IMPORTANT: APNE DEPLOYED GOOGLE APPS SCRIPT KA URL YAHAN BHI PASTE KAREIN
-// =================================================================================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJUyYMUqE29p594h6WHnh7OIuiw7g69J3OdTaJRrN9wYTDv3OQPQeGIdE6HDkItQLy7A/exec";
 
 let loadedData = {};
@@ -190,16 +198,16 @@ let draftHeaders = [];
 let approvalHeaders = [];
 const DEFAULT_COLS_DRAFT = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable'];
 const DEFAULT_COLS_SENT = ['Unique ID', 'Vendor', 'FinalAmountPayable', 'AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
+const DEFAULT_COLS_APPROVED = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status'];
 
-// Pagination state
 const paginationState = {
   pending: { currentPage: 1, entriesPerPage: 20 },
   sent: { currentPage: 1, entriesPerPage: 20 },
   deleted: { currentPage: 1, entriesPerPage: 20 },
+  approved: { currentPage: 1, entriesPerPage: 20 },
 };
 const ENTRIES_PER_PAGE_OPTIONS = [20, 30, 50, 100, 200];
 
-// --- NEW: Helper function to call the backend API ---
 async function callAppsScript(functionName, params = []) {
   const requestData = { action: functionName, params: params };
   try {
@@ -219,7 +227,6 @@ async function callAppsScript(functionName, params = []) {
   }
 }
 
-// --- MODIFIED and NEW Functions ---
 document.addEventListener("DOMContentLoaded", () => {
   const currentUser = localStorage.getItem('approvalName');
   if (!currentUser) {
@@ -246,13 +253,23 @@ async function fetchAndRenderData() {
     loadedData = data;
     draftHeaders = data.draftHeaders;
     approvalHeaders = data.approvalHeaders;
+    // NEW: Fetch and store approved entries separately
+    const approvedResponse = await callAppsScript('getApprovedEntries');
+    if (approvedResponse.success) {
+        loadedData.approved = approvedResponse.approved;
+        // approvalHeaders are the same for sent and approved
+    } else {
+        loadedData.approved = [];
+        console.error('Failed to fetch approved entries:', approvedResponse.message);
+    }
     initializeColumnSelectors();
-    renderTable('pending', data.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
-    renderTable('sent', data.sent, paginationState.sent.currentPage, paginationState.sent.entriesPerPage);
-    renderTable('deleted', data.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
+    renderTable('pending', loadedData.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
+    renderTable('sent', loadedData.sent, paginationState.sent.currentPage, paginationState.sent.entriesPerPage);
+    renderTable('deleted', loadedData.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
+    renderTable('approved', loadedData.approved, paginationState.approved.currentPage, paginationState.approved.entriesPerPage);
   } else {
     alert('Failed to load data: ' + data.message);
-    ['pending','sent','deleted'].forEach(type => document.getElementById(`${type}-loader`).style.display = 'none');
+    ['pending','sent','deleted','approved'].forEach(type => document.getElementById(`${type}-loader`).style.display = 'none');
   }
 }
 
@@ -282,7 +299,6 @@ document.getElementById('modify-form').addEventListener('submit', async function
   }
 });
 
-// --- UNCHANGED HELPER FUNCTIONS ---
 function openModal(modalId) {
   document.getElementById(modalId).style.display = 'flex';
 }
@@ -311,7 +327,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
   document.getElementById(`${tableType}-loader`).style.display = 'none';
   const isDraftTable = tableType === 'pending' || tableType === 'deleted';
   const headersToUse = isDraftTable ? draftHeaders : approvalHeaders;
-  const defaultCols = isDraftTable ? DEFAULT_COLS_DRAFT : DEFAULT_COLS_SENT;
+  const defaultCols = isDraftTable ? DEFAULT_COLS_DRAFT : (tableType === 'approved' ? DEFAULT_COLS_APPROVED : DEFAULT_COLS_SENT);
   const storageKey = `biller-${tableType}-cols`;
   let visibleCols = JSON.parse(localStorage.getItem(storageKey)) || defaultCols;
 
@@ -331,44 +347,48 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
   const endIndex = Math.min(startIndex + entriesPerPage, totalEntries);
   const paginatedData = data.slice(startIndex, endIndex);
 
-  // Render table headers
   const headerRow = document.createElement('tr');
   let headerHtml = visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
-  if (tableType === 'pending' || tableType === 'sent') headerHtml += '<th>Actions</th>';
+  if (tableType === 'pending' || tableType === 'sent' || tableType === 'approved') headerHtml += '<th>Actions</th>';
   headerRow.innerHTML = headerHtml;
   thead.appendChild(headerRow);
 
-  // Render table rows
   paginatedData.forEach(entry => {
     const uniqueId = entry['Unique ID'];
     const row = document.createElement('tr');
-    row.onclick = () => openModifyModal(uniqueId, tableType === 'pending');
+    row.onclick = () => {
+      if (tableType === 'approved' || tableType === 'sent') {
+        openPayModal(uniqueId);
+      } else {
+        openModifyModal(uniqueId, tableType === 'pending');
+      }
+    };
     
     let rowHtml = visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
     
-    // Action buttons for 'pending' table
     if (tableType === 'pending') {
       rowHtml += `<td onclick="event.stopPropagation()">
         <button class="action-btn modify-btn" onclick="openModifyModal('${uniqueId}', true)">Modify</button>
         <button class="action-btn send-btn" onclick="updateStatus('${uniqueId}', 'sent')">Send</button>
         <button class="action-btn delete-btn" onclick="updateStatus('${uniqueId}', 'Delete')">Delete</button>
       </td>`;
-    } 
-    // Action buttons for 'sent' table
-    else if (tableType === 'sent') {
+    } else if (tableType === 'sent') {
       const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
       const isApproved = finalStatus === 'approved';
       
       rowHtml += `<td onclick="event.stopPropagation()">
         <button class="action-btn seepay-btn" onclick="openPayModal('${uniqueId}')" ${isApproved ? '' : 'disabled'}>See Pay</button>
       </td>`;
+    } else if (tableType === 'approved') {
+        rowHtml += `<td onclick="event.stopPropagation()">
+          <button class="action-btn seepay-btn" onclick="openPayModal('${uniqueId}')">See Pay</button>
+        </td>`;
     }
 
     row.innerHTML = rowHtml;
     tbody.appendChild(row);
   });
 
-  // Render pagination controls
   const prevButton = document.createElement('button');
   prevButton.textContent = 'Previous';
   prevButton.disabled = currentPage === 1;
@@ -410,11 +430,11 @@ function changeEntriesPerPage(tableType, newEntriesPerPage) {
 }
 
 function initializeColumnSelectors() {
-  ['pending', 'sent', 'deleted'].forEach(tableType => {
+  ['pending', 'sent', 'deleted', 'approved'].forEach(tableType => {
     const selectorContainer = document.getElementById(`${tableType}-selector`);
     const isDraftTable = tableType === 'pending' || tableType === 'deleted';
     const headersToUse = isDraftTable ? draftHeaders : approvalHeaders;
-    const defaultCols = isDraftTable ? DEFAULT_COLS_DRAFT : DEFAULT_COLS_SENT;
+    const defaultCols = isDraftTable ? DEFAULT_COLS_DRAFT : (tableType === 'approved' ? DEFAULT_COLS_APPROVED : DEFAULT_COLS_SENT);
     const storageKey = `biller-${tableType}-cols`;
     const btn = document.createElement('button');
     btn.className = 'column-selector-btn';
@@ -462,13 +482,11 @@ function openModifyModal(uniqueId, isEditable) {
   openModal('modify-modal');
 }
 
-// NEW: Function to open the 'See Pay' modal and fetch data
 async function openPayModal(uniqueId) {
     openModal('pay-modal');
     document.getElementById('pay-loader').style.display = 'block';
     const modalBody = document.getElementById('pay-modal-body');
     
-    // Fetch the single entry data from the approval sheet
     const response = await callAppsScript('getSingleEntry', [uniqueId]);
 
     if (!response.success || !response.entry) {
@@ -479,26 +497,25 @@ async function openPayModal(uniqueId) {
 
     const entry = response.entry;
     
-    // Render the data in the "image" format
     modalBody.innerHTML = `
-        <h3 style="margin-top: 0;">${entry['Company N']}</h3>
-        <p><b>Vendor:</b> ${entry['Vendor Name']}</p>
-        <p><b>Invoice Date:</b> ${entry['InvoiceDate']}</p>
-        <p><b>Invoice No.:</b> ${entry['InvoiceNumber']}</p>
+        <h3 style="margin-top: 0;">${entry['Company N'] || 'N/A'}</h3>
+        <p><b>Vendor:</b> ${entry['Vendor Name'] || 'N/A'}</p>
+        <p><b>Invoice Date:</b> ${entry['InvoiceDate'] || 'N/A'}</p>
+        <p><b>Invoice No.:</b> ${entry['InvoiceNumber'] || 'N/A'}</p>
         <hr/>
         
         <div class="pay-grid">
             <div class="pay-box approved">
                 <div class="pay-box-label">Sum of Taxable Value</div>
-                <div class="pay-box-value">${entry['Sum of Taxable Value']}</div>
+                <div class="pay-box-value">${entry['Sum of Taxable Value'] || 'N/A'}</div>
             </div>
             <div class="pay-box approved">
                 <div class="pay-box-label">Sum of TDS Payable</div>
-                <div class="pay-box-value">${entry['Sum of TDS Payable']}</div>
+                <div class="pay-box-value">${entry['Sum of TDS Payable'] || 'N/A'}</div>
             </div>
             <div class="pay-box approved">
                 <div class="pay-box-label">Sum of Net Payable</div>
-                <div class="pay-box-value">${entry['Sum of Net Payable']}</div>
+                <div class="pay-box-value">${entry['Sum of Net Payable'] || 'N/A'}</div>
             </div>
             <div class="pay-remarks">
                 <div class="pay-remarks-label">Final Approval Status</div>
@@ -510,13 +527,13 @@ async function openPayModal(uniqueId) {
             </div>
         </div>
         <div style="margin-top: 20px; text-align: right;">
-            <p><b>Final Amount Payable:</b> ${entry['FinalAmountPayable']}</p>
+            <p><b>Final Amount Payable:</b> ${entry['FinalAmountPayable'] || 'N/A'}</p>
         </div>
     `;
 }
 
 function showLoader() {
-  ['pending','sent','deleted'].forEach(type => {
+  ['pending','sent','deleted','approved'].forEach(type => {
     document.getElementById(`${type}-loader`).style.display = 'block';
     document.getElementById(`${type}-table`).style.display = 'none';
     document.getElementById(`no-${type}`).style.display = 'none';
