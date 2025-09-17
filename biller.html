@@ -329,10 +329,10 @@ async function sendMultipleToPay() {
         return;
     }
 
-    if (confirm(`Are you sure you want to send ${checkboxes.length} entries to pay?`)) {
-        showLoader();
-        const uniqueIds = Array.from(checkboxes).map(cb => cb.dataset.uniqueId);
+    const uniqueIds = Array.from(checkboxes).map(cb => cb.dataset.uniqueId);
 
+    if (confirm(`Are you sure you want to send ${uniqueIds.length} approved entr${uniqueIds.length === 1 ? 'y' : 'ies'} to the 'Ready to Pay' list?`)) {
+        showLoader();
         const response = await callAppsScript('moveMultipleToPaySheet', [uniqueIds]);
         
         if (response.success) {
