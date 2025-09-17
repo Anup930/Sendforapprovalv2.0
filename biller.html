@@ -929,10 +929,18 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     const uniqueId = entry['Unique ID'];
     const row = document.createElement('tr');
     
-    // Add a click handler to the entire row
+    // Corrected row click handler to open the appropriate modal
     row.onclick = () => {
-      // Pass a flag to indicate the data source
-      openPayModal(uniqueId, tableType); 
+      if (tableType === 'sent') {
+          // For 'Sent' entries, open the read-only modify modal
+          openModifyModal(uniqueId, false);
+      } else if (tableType === 'approved') {
+          // For 'Approved' (paid) entries, open the 'See Pay' modal
+          openPayModal(uniqueId);
+      } else {
+          // For 'Pending' and 'Deleted', open the editable modify modal
+          openModifyModal(uniqueId, true);
+      }
     };
 
     let rowHtml = visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
@@ -952,7 +960,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
       </td>`;
     } else if (tableType === 'approved') {
         rowHtml += `<td onclick="event.stopPropagation()">
-          <button class="action-btn add-pay-btn" onclick="openPayModal('${uniqueId}', '${tableType}')">See Pay</button>
+          <button class="action-btn add-pay-btn" onclick="openPayModal('${uniqueId}')">See Pay</button>
         </td>`;
     }
 
@@ -1053,21 +1061,12 @@ function openModifyModal(uniqueId, isEditable) {
   openModal('modify-modal');
 }
 
-// Corrected logic for fetching data based on the table type
-async function openPayModal(uniqueId, tableType) {
+async function openPayModal(uniqueId) {
     openModal('pay-modal');
     document.getElementById('pay-loader').style.display = 'block';
     const modalBody = document.getElementById('pay-modal-body');
     
-    let response;
-    if (tableType === 'sent') {
-        // Fetch from the loaded data for the 'sent' table
-        const entry = loadedData.sent.find(e => e['Unique ID'] === uniqueId);
-        response = { success: !!entry, entry: entry, message: entry ? '' : 'Entry not found in Sent for Approval list.' };
-    } else {
-        // Fetch from the backend for 'approved' (paid) entries
-        response = await callAppsScript('getSingleEntry', [uniqueId]);
-    }
+    const response = await callAppsScript('getSingleEntry', [uniqueId]);
 
     if (!response.success || !response.entry) {
         modalBody.innerHTML = `<p class="loader" style="color:red;">Error fetching data: ${response.message || 'Entry not found.'}</p>`;
@@ -1124,4 +1123,3 @@ function showLoader() {
 </body>
 </html>
 
- 
