@@ -133,7 +133,7 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Sent for Approval</h2>
 <div class="header-controls">
-<button class="action-btn" onclick="sendMultipleToPay()">Add Selected to Pay</button>
+<button id="bulk-pay-btn" class="action-btn" onclick="sendMultipleToPay()" style="display:none;">Add Selected to Pay</button>
 <div class="column-selector" id="sent-selector"></div>
 <div id="sent-pagination" class="pagination-controls" style="display:none;"></div>
 </div>
@@ -404,11 +404,21 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     document.getElementById(`no-${tableType}`).style.display = 'block';
     table.style.display = 'none';
     paginationContainer.style.display = 'none';
+    if(tableType === 'sent') {
+        document.getElementById('bulk-pay-btn').style.display = 'none';
+    }
     return;
   }
   document.getElementById(`no-${tableType}`).style.display = 'none';
   table.style.display = 'table';
   paginationContainer.style.display = 'flex';
+
+  // Show bulk pay button if in the 'sent' section and there's data
+  if(tableType === 'sent') {
+      document.getElementById('bulk-pay-btn').style.display = 'block';
+  } else {
+      document.getElementById('bulk-pay-btn').style.display = 'none';
+  }
 
   const totalEntries = data.length;
   const totalPages = Math.ceil(totalEntries / entriesPerPage);
@@ -483,8 +493,15 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
               checkboxes.forEach(cb => {
                   cb.checked = e.target.checked;
               });
+              toggleBulkPayButton();
           });
       }
+      
+      // Add event listener to each row checkbox to toggle button visibility
+      const rowCheckboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]');
+      rowCheckboxes.forEach(cb => {
+          cb.addEventListener('change', toggleBulkPayButton);
+      });
   }
 
 
@@ -526,6 +543,15 @@ function changeEntriesPerPage(tableType, newEntriesPerPage) {
   paginationState[tableType].entriesPerPage = newEntriesPerPage;
   paginationState[tableType].currentPage = 1;
   renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+}
+
+// NEW FUNCTION: Toggles the visibility of the bulk pay button
+function toggleBulkPayButton() {
+    const checkedCount = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:checked').length;
+    const bulkPayBtn = document.getElementById('bulk-pay-btn');
+    if (bulkPayBtn) {
+        bulkPayBtn.style.display = checkedCount > 0 ? 'block' : 'none';
+    }
 }
 
 function initializeColumnSelectors() {
