@@ -133,6 +133,7 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Sent for Approval</h2>
 <div class="header-controls">
+<button class="action-btn" onclick="sendMultipleToPay()">Add Selected to Pay</button>
 <div class="column-selector" id="sent-selector"></div>
 <div id="sent-pagination" class="pagination-controls" style="display:none;"></div>
 </div>
@@ -269,6 +270,9 @@ async function fetchAndRenderData() {
     draftHeaders = data.draftHeaders;
     approvalHeaders = data.approvalHeaders;
 
+    // Reverse the sent array to show latest entries first
+    loadedData.sent = data.sent.reverse();
+
     const payResponse = await callAppsScript('getPayDataByStatus', ['Ready to Pay', 'Completed', 'Rejected', 'Hold']);
     if (payResponse.success) {
       loadedData.readytopay = payResponse.data.filter(e => e['Pay Status'] === 'Ready to Pay');
@@ -308,6 +312,29 @@ async function addInPay(uniqueId) {
     if (confirm("Are you sure you want to add this entry to the pay list?")) {
         showLoader();
         const response = await callAppsScript('moveEntryToPaySheet', [uniqueId]);
+        if (response.success) {
+            alert(response.message);
+            fetchAndRenderData();
+        } else {
+            alert("Error adding to pay list: " + response.message);
+            fetchAndRenderData();
+        }
+    }
+}
+
+async function sendMultipleToPay() {
+    const checkboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:checked');
+    if (checkboxes.length === 0) {
+        alert("Please select at least one entry to send to pay.");
+        return;
+    }
+
+    if (confirm(`Are you sure you want to send ${checkboxes.length} entries to pay?`)) {
+        showLoader();
+        const uniqueIds = Array.from(checkboxes).map(cb => cb.dataset.uniqueId);
+
+        const response = await callAppsScript('moveMultipleToPaySheet', [uniqueIds]);
+        
         if (response.success) {
             alert(response.message);
             fetchAndRenderData();
@@ -390,7 +417,11 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
   const paginatedData = data.slice(startIndex, endIndex);
 
   const headerRow = document.createElement('tr');
-  let headerHtml = visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
+  let headerHtml = '';
+  if (tableType === 'sent') {
+    headerHtml += '<th><input type="checkbox" id="select-all-sent"></th>';
+  }
+  headerHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
   if (tableType === 'pending' || tableType === 'sent' || tableType === 'readytopay' || tableType === 'approved') headerHtml += '<th>Actions</th>';
   headerRow.innerHTML = headerHtml;
   thead.appendChild(headerRow);
@@ -409,7 +440,16 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
       }
     };
 
-    let rowHtml = visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
+    let rowHtml = '';
+    if (tableType === 'sent') {
+        const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
+        const isApproved = finalStatus === 'approved';
+        rowHtml += `<td onclick="event.stopPropagation()">
+            <input type="checkbox" data-unique-id="${uniqueId}" ${isApproved ? '' : 'disabled'}>
+          </td>`;
+    }
+
+    rowHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
     
     if (tableType === 'pending') {
       rowHtml += `<td onclick="event.stopPropagation()">
@@ -433,6 +473,20 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     row.innerHTML = rowHtml;
     tbody.appendChild(row);
   });
+  
+  // Add "select all" functionality
+  if (tableType === 'sent') {
+      const selectAllCheckbox = document.getElementById('select-all-sent');
+      if (selectAllCheckbox) {
+          selectAllCheckbox.addEventListener('change', (e) => {
+              const checkboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:not(:disabled)');
+              checkboxes.forEach(cb => {
+                  cb.checked = e.target.checked;
+              });
+          });
+      }
+  }
+
 
   const prevButton = document.createElement('button');
   prevButton.textContent = 'Previous';
