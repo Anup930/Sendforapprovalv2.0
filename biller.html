@@ -1,5 +1,4 @@
-<!-- v.6.1 -->
-
+v.6.2
 
 <!DOCTYPE html>
 <html>
@@ -741,14 +740,15 @@ async function downloadPdf() {
     
     const doc = new jsPDF();
     
-    const visibleHeaders = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText).filter(text => text !== '');
+    // Get visible headers from the table and exclude the first header (checkbox column)
+    const visibleHeaders = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText).filter(text => text !== '').slice(1);
     
     const rows = [];
     checkboxes.forEach(cb => {
         const row = cb.closest('tr');
         const rowData = [];
         Array.from(row.querySelectorAll('td')).forEach((td, index) => {
-            if (index > 0) { // Skip the checkbox column
+            if (index > 0) { // Skip the first column (checkbox)
                 rowData.push(td.innerText);
             }
         });
@@ -756,7 +756,7 @@ async function downloadPdf() {
     });
     
     doc.autoTable({
-        head: [visibleHeaders.slice(1)], // Skip the first header (for the checkbox column)
+        head: [visibleHeaders], 
         body: rows,
         startY: 20,
         styles: {
