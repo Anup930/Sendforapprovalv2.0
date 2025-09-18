@@ -1,4 +1,4 @@
-<!-- V.5.8 -->
+<!-- V.5.9 -->
 
 <!DOCTYPE html>
 <html>
@@ -371,6 +371,22 @@ async function sendMultipleToPay() {
     }
 }
 
+// Function to handle adding a single item to the pay list
+async function addInPay(uniqueId) {
+    if (confirm(`Are you sure you want to add this approved entry to the 'Ready to Pay' list?`)) {
+        showLoader();
+        const response = await callAppsScript('moveMultipleToPaySheet', [[uniqueId]]);
+        
+        if (response.success) {
+            alert(response.message);
+            fetchAndRenderData();
+        } else {
+            alert("Error adding to pay list: " + response.message);
+            fetchAndRenderData();
+        }
+    }
+}
+
 document.getElementById('modify-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const updatedEntry = Object.fromEntries(new FormData(e.target).entries());
@@ -513,7 +529,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         } else if (tableType === 'approved') {
              const currentPayStatus = (entry['Pay Status'] || '').toLowerCase();
              let actionButtons = '';
-             actionButtons = `<span style="color: #6c757d; font-style: italic;">${entry['Pay Status'] || 'No Action'}</span>`;
+             actionButtons = `<span style="color: #6c757d; font-style: italic;">${currentPayStatus || 'No Action'}</span>`;
              rowHtml += `<td onclick="event.stopPropagation()">${actionButtons}</td>`;
         }
 
