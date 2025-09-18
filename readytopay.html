@@ -23,7 +23,7 @@
         tbody tr { cursor: pointer; transition: background-color 0.2s; }
         tbody tr:hover { background-color: #e9ebee; }
         .action-btn { padding: 6px 12px; margin: 0 5px 0 0; font-size: 14px; border-radius: 6px; border: none; cursor: pointer; color: white; }
-        .complete-btn { background-color: #28a745; }
+        .complete-btn { background-color: #28a745; } /* This is the 'Pay' button style */
         .reject-btn { background-color: #dc3545; }
         .hold-btn { background-color: #ffc107; }
         .loader { text-align: center; padding: 20px; font-size: 1.2em; }
@@ -116,7 +116,10 @@
 
     async function fetchAndRenderData() {
         showLoader();
-        const response = await callAppsScript('getPayDataByStatus', ['Ready to Pay']);
+        // Fetch items that are 'Ready to Pay' or 'Pending' for the Payer to see.
+        // Assuming 'Ready to Pay' is the initial status when moved from Approval,
+        // and 'Pending' is the status after the Payer takes action but before final payment.
+        const response = await callAppsScript('getPayDataByStatus', ['Ready to Pay', 'Pending', 'Hold']);
         if (response.success) {
             loadedData.readytopay = response.data;
             renderTable('readytopay', loadedData.readytopay);
@@ -126,13 +129,23 @@
         }
     }
 
-    async function updatePayStatus(uniqueId, newStatus) {
+    // Modified function to update Pay Status with a remark
+    async function updatePayStatusWithRemark(uniqueId, newStatus) {
+        let payerRemark = '';
+        if (newStatus === 'Pending') { // Only ask for remark if changing to Pending
+             payerRemark = prompt("Please enter a remark for this action:");
+             if (payerRemark === null) { // User clicked cancel
+                 return;
+             }
+        }
+       
         if (confirm(`Are you sure you want to change the status to '${newStatus}'?`)) {
             showLoader();
-            const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus]);
+            // Call the modified Apps Script function with the remark
+            const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, payerRemark]);
             if (response.success) {
                 alert(response.message);
-                fetchAndRenderData();
+                fetchAndRenderData(); // Re-fetch and render to update the table
             } else {
                 alert("Error: " + response.message);
                 showLoader(false);
@@ -179,11 +192,28 @@
             
             let rowHtml = visibleHeaders.map(h => `<td>${entry[h] || ''}</td>`).join('');
             
-            rowHtml += `<td onclick="event.stopPropagation()">
-                <button class="action-btn complete-btn" onclick="updatePayStatus('${uniqueId}', 'Completed')">Pay</button>
-                <button class="action-btn reject-btn" onclick="updatePayStatus('${uniqueId}', 'Rejected')">Reject</button>
-                <button class="action-btn hold-btn" onclick="updatePayStatus('${uniqueId}', 'Hold')">Hold</button>
-            </td>`;
+            // Adjust buttons based on current Pay Status
+            const currentPayStatus = (entry['Pay Status'] || '').toLowerCase();
+            let actionButtons = '';
+
+            if (currentPayStatus === 'ready to pay') {
+                 // For initial 'Ready to Pay' status, show a 'Send for Pay' button (which sets to Pending)
+                actionButtons = `<button class="action-btn complete-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Pending')">Send for Pay</button>
+                                 <button class="action-btn reject-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Rejected')">Reject</button>
+                                 <button class="action-btn hold-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Hold')">Hold</button>`;
+            } else if (currentPayStatus === 'pending') {
+                 // If already 'Pending', maybe show a 'Mark as Paid' or 'Complete' button
+                 actionButtons = `<button class="action-btn complete-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Completed')">Mark as Paid</button>
+                                  <button class="action-btn reject-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Rejected')">Reject</button>
+                                  <button class="action-btn hold-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Hold')">Hold</button>`;
+            } else if (currentPayStatus === 'hold') {
+                actionButtons = `<button class="action-btn complete-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Pending')">Resume Pay</button>
+                                 <button class="action-btn reject-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Rejected')">Reject</button>`;
+            } else { // For 'Completed' or 'Rejected', no actions
+                actionButtons = `<span style="color: #6c757d; font-style: italic;">${entry['Pay Status'] || 'No Action'}</span>`;
+            }
+
+            rowHtml += `<td onclick="event.stopPropagation()">${actionButtons}</td>`;
             
             row.innerHTML = rowHtml;
             tbody.appendChild(row);
@@ -240,6 +270,11 @@
                 <div class="pay-remarks">
                     <div class="pay-remarks-label">Final Approval Remarks</div>
                     <div class="pay-remarks-text">${entry['Final Approval Remarks'] || 'No remarks.'}</div>
+                </div>
+                <!-- Display Payer Remark in modal -->
+                <div class="pay-remarks">
+                    <div class="pay-remarks-label">Payer Remark</div>
+                    <div class="pay-remarks-text">${entry['Payer Remark'] || 'No Payer remark yet.'}</div>
                 </div>
             </div>
             <div style="margin-top: 20px; text-align: right;">
