@@ -1,5 +1,3 @@
-<!-- V.5.6 -->
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -78,8 +76,8 @@ tbody tr:hover { background-color: #e9ebee; }
 }
     
 #bulk-pay-btn {
-  color: black;
-  font-weight: bold;
+    color: black;
+    font-weight: bold;
 }
 .pay-box-label {
     font-size: 0.8em;
@@ -128,8 +126,7 @@ tbody tr:hover { background-color: #e9ebee; }
 <button id="nav-pending" onclick="showSection('pending')">Pending</button>
 <button id="nav-sent" onclick="showSection('sent')">Sent for Approval</button>
 <button id="nav-deleted" onclick="showSection('deleted')">Deleted</button>
-<!-- <button id="nav-readytopay" onclick="showSection('readytopay')">Ready to Pay</button> -->
-    <button id="nav-readytopay" onclick="showSection('readytopay')">Ready to Pay</button>
+<button id="nav-readytopay" onclick="showSection('readytopay')">Ready to Pay</button>
 <button id="nav-approved" onclick="showSection('approved')">Paid</button>
 </div>
 <button class="logout-btn" onclick="logoutUser()">Logout</button>
@@ -231,112 +228,120 @@ let draftHeaders = [];
 let approvalHeaders = [];
 const DEFAULT_COLS_DRAFT = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable'];
 const DEFAULT_COLS_SENT = ['Unique ID', 'Vendor', 'FinalAmountPayable', 'AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
-const DEFAULT_COLS_READYTOPAY = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status'];
+const DEFAULT_COLS_READYTOPAY = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status', 'Payer Remark'];
 const DEFAULT_COLS_APPROVED = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status'];
 
 const paginationState = {
-  pending: { currentPage: 1, entriesPerPage: 20 },
-  sent: { currentPage: 1, entriesPerPage: 20 },
-  deleted: { currentPage: 1, entriesPerPage: 20 },
-  readytopay: { currentPage: 1, entriesPerPage: 20 },
-  approved: { currentPage: 1, entriesPerPage: 20 },
+    pending: { currentPage: 1, entriesPerPage: 20 },
+    sent: { currentPage: 1, entriesPerPage: 20 },
+    deleted: { currentPage: 1, entriesPerPage: 20 },
+    readytopay: { currentPage: 1, entriesPerPage: 20 },
+    approved: { currentPage: 1, entriesPerPage: 20 },
 };
 const ENTRIES_PER_PAGE_OPTIONS = [20, 30, 50, 100, 200];
 
 async function callAppsScript(functionName, params = []) {
-  const requestData = { action: functionName, params: params };
-  try {
-    const response = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(requestData),
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-    });
-    if (!response.ok) {
-      throw new Error(`Network response was not ok: ${response.statusText}`);
+    const requestData = { action: functionName, params: params };
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(requestData),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+        if (!response.ok) {
+            throw new Error(`Network response was not ok: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error("Error calling Apps Script:", error);
+        return { success: false, message: error.message };
     }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Error calling Apps Script:", error);
-    return { success: false, message: error.message };
-  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const currentUser = localStorage.getItem('approvalName');
-  if (!currentUser) {
-    window.location.href = 'index.html';
-    return;
-  }
-  document.getElementById('welcome-message').textContent += ` (Welcome, ${currentUser})`;
-  window.addEventListener('click', (e) => {
-    document.querySelectorAll('.column-dropdown').forEach(d => d.classList.remove('visible'));
-  });
-  fetchAndRenderData();
-  showSection('pending');
+    const currentUser = localStorage.getItem('approvalName');
+    if (!currentUser) {
+        window.location.href = 'index.html';
+        return;
+    }
+    document.getElementById('welcome-message').textContent += ` (Welcome, ${currentUser})`;
+    window.addEventListener('click', (e) => {
+        document.querySelectorAll('.column-dropdown').forEach(d => d.classList.remove('visible'));
+    });
+    fetchAndRenderData();
+    showSection('pending');
 });
 
 function logoutUser() {
-  localStorage.clear();
-  window.location.href = 'index.html';
+    localStorage.clear();
+    window.location.href = 'index.html';
 }
 
 async function fetchAndRenderData() {
-  showLoader();
-  const data = await callAppsScript('getBillerData');
-  if (data.success) {
-    loadedData = data;
-    draftHeaders = data.draftHeaders;
-    approvalHeaders = data.approvalHeaders;
+    showLoader();
+    const data = await callAppsScript('getBillerData');
+    if (data.success) {
+        loadedData = data;
+        draftHeaders = data.draftHeaders;
+        approvalHeaders = data.approvalHeaders;
 
-    // Reverse the sent array to show latest entries first
-    loadedData.sent = data.sent.reverse();
+        // Reverse the sent array to show latest entries first
+        loadedData.sent = data.sent.reverse();
 
-    const payResponse = await callAppsScript('getPayDataByStatus', ['Ready to Pay', 'Completed', 'Rejected', 'Hold']);
-    if (payResponse.success) {
-      loadedData.readytopay = payResponse.data.filter(e => e['Pay Status'] === 'Ready to Pay');
-      loadedData.approved = payResponse.data.filter(e => e['Pay Status'] === 'Completed');
+        const payResponse = await callAppsScript('getPayDataByStatus', ['Ready to Pay', 'Completed', 'Rejected', 'Hold', 'Pending']);
+        if (payResponse.success) {
+            loadedData.readytopay = payResponse.data;
+            loadedData.approved = payResponse.data.filter(e => e['Pay Status'] === 'Completed');
+        } else {
+            loadedData.readytopay = [];
+            loadedData.approved = [];
+            console.error('Failed to fetch paid entries:', payResponse.message);
+        }
+
+        initializeColumnSelectors();
+        renderTable('pending', loadedData.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
+        renderTable('sent', loadedData.sent, paginationState.sent.currentPage, paginationState.sent.entriesPerPage);
+        renderTable('deleted', loadedData.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
+        renderTable('readytopay', loadedData.readytopay, paginationState.readytopay.currentPage, paginationState.readytopay.entriesPerPage);
+        renderTable('approved', loadedData.approved, paginationState.approved.currentPage, paginationState.approved.entriesPerPage);
     } else {
-      loadedData.readytopay = [];
-      loadedData.approved = [];
-      console.error('Failed to fetch paid entries:', payResponse.message);
+        alert('Failed to load data: ' + data.message);
+        ['pending','sent','deleted','readytopay','approved'].forEach(type => document.getElementById(`${type}-loader`).style.display = 'none');
     }
-
-    initializeColumnSelectors();
-    renderTable('pending', loadedData.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
-    renderTable('sent', loadedData.sent, paginationState.sent.currentPage, paginationState.sent.entriesPerPage);
-    renderTable('deleted', loadedData.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
-    renderTable('readytopay', loadedData.readytopay, paginationState.readytopay.currentPage, paginationState.readytopay.entriesPerPage);
-    renderTable('approved', loadedData.approved, paginationState.approved.currentPage, paginationState.approved.entriesPerPage);
-  } else {
-    alert('Failed to load data: ' + data.message);
-    ['pending','sent','deleted','readytopay','approved'].forEach(type => document.getElementById(`${type}-loader`).style.display = 'none');
-  }
 }
 
 async function updateStatus(uniqueId, status) {
-  const action = status === 'sent' ? 'send for approval' : 'delete';
-  if (confirm(`Are you sure you want to ${action} this entry?`)) {
-    showLoader();
-    const response = await callAppsScript('updateBillerStatus', [uniqueId, status]);
-    if (response.success) {
-      fetchAndRenderData();
-    } else {
-      alert('Error: ' + response.message);
+    const action = status === 'sent' ? 'send for approval' : 'delete';
+    if (confirm(`Are you sure you want to ${action} this entry?`)) {
+        showLoader();
+        const response = await callAppsScript('updateBillerStatus', [uniqueId, status]);
+        if (response.success) {
+            fetchAndRenderData();
+        } else {
+            alert('Error: ' + response.message);
+        }
     }
-  }
 }
 
-async function addInPay(uniqueId) {
-    if (confirm("Are you sure you want to add this entry to the pay list?")) {
+async function updatePayStatusWithRemark(uniqueId, newStatus) {
+    const actionName = newStatus === 'Pending' ? 'Send for Pay' : 'Update status';
+    if (confirm(`Are you sure you want to change the status to '${newStatus}'?`)) {
+        let payerRemark = '';
+        if (newStatus === 'Pending') {
+            payerRemark = prompt("Please enter a remark for this action:");
+            if (payerRemark === null) { // User clicked cancel
+                return;
+            }
+        }
         showLoader();
-        const response = await callAppsScript('moveEntryToPaySheet', [uniqueId]);
+        const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, payerRemark]);
         if (response.success) {
             alert(response.message);
             fetchAndRenderData();
         } else {
-            alert("Error adding to pay list: " + response.message);
-            fetchAndRenderData();
+            alert("Error: " + response.message);
+            showLoader(false);
         }
     }
 }
@@ -365,202 +370,214 @@ async function sendMultipleToPay() {
 }
 
 document.getElementById('modify-form').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const updatedEntry = Object.fromEntries(new FormData(e.target).entries());
-  closeModal('modify-modal');
-  showLoader();
-  const response = await callAppsScript('updateBillerEntry', [updatedEntry]);
-  if (response.success) {
-    fetchAndRenderData();
-  } else {
-    alert('Error updating: ' + response.message);
-  }
+    e.preventDefault();
+    const updatedEntry = Object.fromEntries(new FormData(e.target).entries());
+    closeModal('modify-modal');
+    showLoader();
+    const response = await callAppsScript('updateBillerEntry', [updatedEntry]);
+    if (response.success) {
+        fetchAndRenderData();
+    } else {
+        alert('Error updating: ' + response.message);
+    }
 });
 
 function openModal(modalId) {
-  document.getElementById(modalId).style.display = 'flex';
+    document.getElementById(modalId).style.display = 'flex';
 }
 
 function closeModal(modalId) {
-  document.getElementById(modalId).style.display = 'none';
+    document.getElementById(modalId).style.display = 'none';
 }
 
 function showSection(sectionName) {
-  document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('visible'));
-  document.querySelectorAll('.sidebar-nav button').forEach(btn => btn.classList.remove('active'));
-  document.getElementById(sectionName + '-section').classList.add('visible');
-  document.getElementById('nav-' + sectionName).classList.add('active');
+    document.querySelectorAll('.content-section').forEach(sec => sec.classList.remove('visible'));
+    document.querySelectorAll('.sidebar-nav button').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(sectionName + '-section').classList.add('visible');
+    document.getElementById('nav-' + sectionName).classList.add('active');
 }
 
 function renderTable(tableType, data, currentPage, entriesPerPage) {
-  const table = document.getElementById(`${tableType}-table`);
-  const thead = table.querySelector('thead');
-  const tbody = table.querySelector('tbody');
-  const paginationContainer = document.getElementById(`${tableType}-pagination`);
+    const table = document.getElementById(`${tableType}-table`);
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    const paginationContainer = document.getElementById(`${tableType}-pagination`);
 
-  thead.innerHTML = '';
-  tbody.innerHTML = '';
-  paginationContainer.innerHTML = '';
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    paginationContainer.innerHTML = '';
 
-  document.getElementById(`${tableType}-loader`).style.display = 'none';
-  const isDraftTable = tableType === 'pending' || tableType === 'deleted';
-  const headersToUse = isDraftTable ? draftHeaders : approvalHeaders;
-  let defaultCols;
-  if (isDraftTable) {
-    defaultCols = DEFAULT_COLS_DRAFT;
-  } else if (tableType === 'readytopay') {
-    defaultCols = DEFAULT_COLS_READYTOPAY;
-  } else if (tableType === 'approved') {
-    defaultCols = DEFAULT_COLS_APPROVED;
-  } else {
-    defaultCols = DEFAULT_COLS_SENT;
-  }
+    document.getElementById(`${tableType}-loader`).style.display = 'none';
+    const isDraftTable = tableType === 'pending' || tableType === 'deleted';
+    const headersToUse = isDraftTable ? draftHeaders : (tableType === 'readytopay' || tableType === 'approved' ? loadedData.readytopay.length > 0 ? Object.keys(loadedData.readytopay[0]) : approvalHeaders : approvalHeaders);
+    let defaultCols;
+    if (isDraftTable) {
+        defaultCols = DEFAULT_COLS_DRAFT;
+    } else if (tableType === 'readytopay') {
+        defaultCols = DEFAULT_COLS_READYTOPAY;
+    } else if (tableType === 'approved') {
+        defaultCols = DEFAULT_COLS_APPROVED;
+    } else {
+        defaultCols = DEFAULT_COLS_SENT;
+    }
 
-  const storageKey = `biller-${tableType}-cols`;
-  let visibleCols = JSON.parse(localStorage.getItem(storageKey)) || defaultCols;
+    const storageKey = `biller-${tableType}-cols`;
+    let visibleCols = JSON.parse(localStorage.getItem(storageKey)) || defaultCols;
 
-  if (!data || data.length === 0) {
-    document.getElementById(`no-${tableType}`).style.display = 'block';
-    table.style.display = 'none';
-    paginationContainer.style.display = 'none';
+    if (!data || data.length === 0) {
+        document.getElementById(`no-${tableType}`).style.display = 'block';
+        table.style.display = 'none';
+        paginationContainer.style.display = 'none';
+        if(tableType === 'sent') {
+            document.getElementById('bulk-pay-btn').style.display = 'none';
+        }
+        return;
+    }
+    document.getElementById(`no-${tableType}`).style.display = 'none';
+    table.style.display = 'table';
+    paginationContainer.style.display = 'flex';
+
+    // --- MODIFIED SECTION FOR BULK BUTTON VISIBILITY ---
     if(tableType === 'sent') {
+        toggleBulkPayButton(); // Call to set initial state based on selected checkboxes
+    } else {
         document.getElementById('bulk-pay-btn').style.display = 'none';
     }
-    return;
-  }
-  document.getElementById(`no-${tableType}`).style.display = 'none';
-  table.style.display = 'table';
-  paginationContainer.style.display = 'flex';
+    // --- END MODIFIED SECTION ---
 
-  // --- MODIFIED SECTION FOR BULK BUTTON VISIBILITY ---
-  if(tableType === 'sent') {
-      toggleBulkPayButton(); // Call to set initial state based on selected checkboxes
-  } else {
-      document.getElementById('bulk-pay-btn').style.display = 'none';
-  }
-  // --- END MODIFIED SECTION ---
+    const totalEntries = data.length;
+    const totalPages = Math.ceil(totalEntries / entriesPerPage);
+    const startIndex = (currentPage - 1) * entriesPerPage;
+    const endIndex = Math.min(startIndex + entriesPerPage, totalEntries);
+    const paginatedData = data.slice(startIndex, endIndex);
 
-  const totalEntries = data.length;
-  const totalPages = Math.ceil(totalEntries / entriesPerPage);
-  const startIndex = (currentPage - 1) * entriesPerPage;
-  const endIndex = Math.min(startIndex + entriesPerPage, totalEntries);
-  const paginatedData = data.slice(startIndex, endIndex);
-
-  const headerRow = document.createElement('tr');
-  let headerHtml = '';
-  if (tableType === 'sent') {
-    headerHtml += '<th><input type="checkbox" id="select-all-sent"></th>';
-  }
-  headerHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
-  if (tableType === 'pending' || tableType === 'sent' || tableType === 'readytopay' || tableType === 'approved') headerHtml += '<th>Actions</th>';
-  headerRow.innerHTML = headerHtml;
-  thead.appendChild(headerRow);
-
-  paginatedData.forEach(entry => {
-    const uniqueId = entry['Unique ID'];
-    const row = document.createElement('tr');
-    
-    row.onclick = () => {
-      if (tableType === 'sent') {
-        openModifyModal(uniqueId, false);
-      } else if (tableType === 'readytopay' || tableType === 'approved') {
-        openPayModal(uniqueId);
-      } else {
-        openModifyModal(uniqueId, true);
-      }
-    };
-
-    let rowHtml = '';
+    const headerRow = document.createElement('tr');
+    let headerHtml = '';
     if (tableType === 'sent') {
-        const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
-        const isApproved = finalStatus === 'approved';
-        rowHtml += `<td onclick="event.stopPropagation()">
-            <input type="checkbox" data-unique-id="${uniqueId}" ${isApproved ? '' : 'disabled'}>
-          </td>`;
+        headerHtml += '<th><input type="checkbox" id="select-all-sent"></th>';
     }
+    headerHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
+    if (tableType === 'pending' || tableType === 'sent' || tableType === 'readytopay' || tableType === 'approved') headerHtml += '<th>Actions</th>';
+    headerRow.innerHTML = headerHtml;
+    thead.appendChild(headerRow);
 
-    rowHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
+    paginatedData.forEach(entry => {
+        const uniqueId = entry['Unique ID'];
+        const row = document.createElement('tr');
+        
+        row.onclick = () => {
+            if (tableType === 'sent') {
+                openModifyModal(uniqueId, false);
+            } else if (tableType === 'readytopay' || tableType === 'approved') {
+                openPayModal(uniqueId);
+            } else {
+                openModifyModal(uniqueId, true);
+            }
+        };
+
+        let rowHtml = '';
+        if (tableType === 'sent') {
+            const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
+            const isApproved = finalStatus === 'approved';
+            rowHtml += `<td onclick="event.stopPropagation()">
+                <input type="checkbox" data-unique-id="${uniqueId}" ${isApproved ? '' : 'disabled'}>
+            </td>`;
+        }
+
+        rowHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
+        
+        if (tableType === 'pending') {
+            rowHtml += `<td onclick="event.stopPropagation()">
+                <button class="action-btn modify-btn" onclick="openModifyModal('${uniqueId}', true)">Modify</button>
+                <button class="action-btn send-btn" onclick="updateStatus('${uniqueId}', 'sent')">Send</button>
+                <button class="action-btn delete-btn" onclick="updateStatus('${uniqueId}', 'Delete')">Delete</button>
+            </td>`;
+        } else if (tableType === 'sent') {
+            const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
+            const isApproved = finalStatus === 'approved';
+            
+            rowHtml += `<td onclick="event.stopPropagation()">
+                <button class="action-btn add-pay-btn" onclick="addInPay('${uniqueId}')" ${isApproved ? '' : 'disabled'}>Add in Pay</button>
+            </td>`;
+        } else if (tableType === 'readytopay') {
+            const currentPayStatus = (entry['Pay Status'] || '').toLowerCase();
+            let actionButtons = '';
+            if (currentPayStatus === 'ready to pay') {
+                 actionButtons = `<button class="action-btn add-pay-btn" onclick="event.stopPropagation(); updatePayStatusWithRemark('${uniqueId}', 'Pending')">Send for Pay</button>`;
+            } else {
+                 actionButtons = `<span style="color: #6c757d; font-style: italic;">${entry['Pay Status'] || 'No Action'}</span>`;
+            }
+            rowHtml += `<td onclick="event.stopPropagation()">${actionButtons}</td>`;
+        } else if (tableType === 'approved') {
+             const currentPayStatus = (entry['Pay Status'] || '').toLowerCase();
+             let actionButtons = '';
+             actionButtons = `<span style="color: #6c757d; font-style: italic;">${entry['Pay Status'] || 'No Action'}</span>`;
+             rowHtml += `<td onclick="event.stopPropagation()">${actionButtons}</td>`;
+        }
+
+        row.innerHTML = rowHtml;
+        tbody.appendChild(row);
+    });
     
-    if (tableType === 'pending') {
-    rowHtml += `<td onclick="event.stopPropagation()">
-      <button class="action-btn add-pay-btn" onclick="updatePayStatusWithRemark('${uniqueId}', 'Pending')">Send for Pay</button>
-    </td>`;
-    } else if (tableType === 'sent') {
-      const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
-      const isApproved = finalStatus === 'approved';
-      
-      rowHtml += `<td onclick="event.stopPropagation()">
-        <button class="action-btn add-pay-btn" onclick="addInPay('${uniqueId}')" ${isApproved ? '' : 'disabled'}>Add in Pay</button>
-      </td>`;
-    } else if (tableType === 'readytopay' || tableType === 'approved') {
-        rowHtml += `<td onclick="event.stopPropagation()">
-          <button class="action-btn add-pay-btn" onclick="openPayModal('${uniqueId}')">Send for Pay</button>
-        </td>`;
+    // Add "select all" functionality
+    if (tableType === 'sent') {
+        const selectAllCheckbox = document.getElementById('select-all-sent');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', (e) => {
+                const checkboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:not(:disabled)');
+                checkboxes.forEach(cb => {
+                    cb.checked = e.target.checked;
+                });
+                toggleBulkPayButton();
+            });
+        }
+        
+        // Add event listener to each row checkbox to toggle button visibility
+        const rowCheckboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]');
+        rowCheckboxes.forEach(cb => {
+            cb.addEventListener('change', toggleBulkPayButton);
+        });
     }
 
-    row.innerHTML = rowHtml;
-    tbody.appendChild(row);
-  });
-  
-  // Add "select all" functionality
-  if (tableType === 'sent') {
-      const selectAllCheckbox = document.getElementById('select-all-sent');
-      if (selectAllCheckbox) {
-          selectAllCheckbox.addEventListener('change', (e) => {
-              const checkboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:not(:disabled)');
-              checkboxes.forEach(cb => {
-                  cb.checked = e.target.checked;
-              });
-              toggleBulkPayButton();
-          });
-      }
-      
-      // Add event listener to each row checkbox to toggle button visibility
-      const rowCheckboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]');
-      rowCheckboxes.forEach(cb => {
-          cb.addEventListener('change', toggleBulkPayButton);
-      });
-  }
 
+    const prevButton = document.createElement('button');
+    prevButton.textContent = 'Previous';
+    prevButton.disabled = currentPage === 1;
+    prevButton.onclick = () => changePage(tableType, currentPage - 1);
+    paginationContainer.appendChild(prevButton);
 
-  const prevButton = document.createElement('button');
-  prevButton.textContent = 'Previous';
-  prevButton.disabled = currentPage === 1;
-  prevButton.onclick = () => changePage(tableType, currentPage - 1);
-  paginationContainer.appendChild(prevButton);
+    const pageInfo = document.createElement('span');
+    pageInfo.className = 'pagination-info';
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${totalEntries} entries)`;
+    paginationContainer.appendChild(pageInfo);
 
-  const pageInfo = document.createElement('span');
-  pageInfo.className = 'pagination-info';
-  pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${totalEntries} entries)`;
-  paginationContainer.appendChild(pageInfo);
+    const nextButton = document.createElement('button');
+    nextButton.textContent = 'Next';
+    nextButton.disabled = currentPage === totalPages;
+    nextButton.onclick = () => changePage(tableType, currentPage + 1);
+    paginationContainer.appendChild(nextButton);
 
-  const nextButton = document.createElement('button');
-  nextButton.textContent = 'Next';
-  nextButton.disabled = currentPage === totalPages;
-  nextButton.onclick = () => changePage(tableType, currentPage + 1);
-  paginationContainer.appendChild(nextButton);
-
-  const perPageSelect = document.createElement('select');
-  ENTRIES_PER_PAGE_OPTIONS.forEach(option => {
-    const opt = document.createElement('option');
-    opt.value = option;
-    opt.textContent = `${option} per page`;
-    if (option === entriesPerPage) opt.selected = true;
-    perPageSelect.appendChild(opt);
-  });
-  perPageSelect.onchange = (e) => changeEntriesPerPage(tableType, parseInt(e.target.value));
-  paginationContainer.appendChild(perPageSelect);
+    const perPageSelect = document.createElement('select');
+    ENTRIES_PER_PAGE_OPTIONS.forEach(option => {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = `${option} per page`;
+        if (option === entriesPerPage) opt.selected = true;
+        perPageSelect.appendChild(opt);
+    });
+    perPageSelect.onchange = (e) => changeEntriesPerPage(tableType, parseInt(e.target.value));
+    paginationContainer.appendChild(perPageSelect);
 }
 
 function changePage(tableType, newPage) {
-  paginationState[tableType].currentPage = newPage;
-  renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+    paginationState[tableType].currentPage = newPage;
+    renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
 }
 
 function changeEntriesPerPage(tableType, newEntriesPerPage) {
-  paginationState[tableType].entriesPerPage = newEntriesPerPage;
-  paginationState[tableType].currentPage = 1;
-  renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+    paginationState[tableType].entriesPerPage = newEntriesPerPage;
+    paginationState[tableType].currentPage = 1;
+    renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
 }
 
 // NEW FUNCTION: Toggles the visibility of the bulk pay button
@@ -573,64 +590,64 @@ function toggleBulkPayButton() {
 }
 
 function initializeColumnSelectors() {
-  ['pending', 'sent', 'deleted', 'readytopay', 'approved'].forEach(tableType => {
-    const selectorContainer = document.getElementById(`${tableType}-selector`);
-    const isDraftTable = tableType === 'pending' || tableType === 'deleted';
-    const headersToUse = isDraftTable ? draftHeaders : approvalHeaders;
-    let defaultCols;
-    if (isDraftTable) {
-      defaultCols = DEFAULT_COLS_DRAFT;
-    } else if (tableType === 'readytopay') {
-      defaultCols = DEFAULT_COLS_READYTOPAY;
-    } else if (tableType === 'approved') {
-      defaultCols = DEFAULT_COLS_APPROVED;
-    } else {
-      defaultCols = DEFAULT_COLS_SENT;
-    }
-    const storageKey = `biller-${tableType}-cols`;
-    const btn = document.createElement('button');
-    btn.className = 'column-selector-btn';
-    btn.textContent = 'Select Columns';
-    const dropdown = document.createElement('div');
-    dropdown.className = 'column-dropdown';
-    let visibleCols = JSON.parse(localStorage.getItem(storageKey)) || defaultCols;
-    headersToUse.forEach(header => {
-      const optionDiv = document.createElement('div');
-      optionDiv.innerHTML = `<input type="checkbox" id="${tableType}-${header}" value="${header}" ${visibleCols.includes(header) ? 'checked' : ''}><label for="${tableType}-${header}">${header}</label>`;
-      optionDiv.querySelector('input').addEventListener('change', () => {
-        const newCols = Array.from(dropdown.querySelectorAll('input:checked')).map(cb => cb.value);
-        localStorage.setItem(storageKey, JSON.stringify(newCols));
-        renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
-      });
-      dropdown.appendChild(optionDiv);
+    ['pending', 'sent', 'deleted', 'readytopay', 'approved'].forEach(tableType => {
+        const selectorContainer = document.getElementById(`${tableType}-selector`);
+        const isDraftTable = tableType === 'pending' || tableType === 'deleted';
+        const headersToUse = isDraftTable ? draftHeaders : (tableType === 'readytopay' || tableType === 'approved' ? loadedData.readytopay.length > 0 ? Object.keys(loadedData.readytopay[0]) : approvalHeaders : approvalHeaders);
+        let defaultCols;
+        if (isDraftTable) {
+            defaultCols = DEFAULT_COLS_DRAFT;
+        } else if (tableType === 'readytopay') {
+            defaultCols = DEFAULT_COLS_READYTOPAY;
+        } else if (tableType === 'approved') {
+            defaultCols = DEFAULT_COLS_APPROVED;
+        } else {
+            defaultCols = DEFAULT_COLS_SENT;
+        }
+        const storageKey = `biller-${tableType}-cols`;
+        const btn = document.createElement('button');
+        btn.className = 'column-selector-btn';
+        btn.textContent = 'Select Columns';
+        const dropdown = document.createElement('div');
+        dropdown.className = 'column-dropdown';
+        let visibleCols = JSON.parse(localStorage.getItem(storageKey)) || defaultCols;
+        headersToUse.forEach(header => {
+            const optionDiv = document.createElement('div');
+            optionDiv.innerHTML = `<input type="checkbox" id="${tableType}-${header}" value="${header}" ${visibleCols.includes(header) ? 'checked' : ''}><label for="${tableType}-${header}">${header}</label>`;
+            optionDiv.querySelector('input').addEventListener('change', () => {
+                const newCols = Array.from(dropdown.querySelectorAll('input:checked')).map(cb => cb.value);
+                localStorage.setItem(storageKey, JSON.stringify(newCols));
+                renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+            });
+            dropdown.appendChild(optionDiv);
+        });
+        selectorContainer.innerHTML = '';
+        selectorContainer.appendChild(btn);
+        selectorContainer.appendChild(dropdown);
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            dropdown.classList.toggle('visible');
+        });
     });
-    selectorContainer.innerHTML = '';
-    selectorContainer.appendChild(btn);
-    selectorContainer.appendChild(dropdown);
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      dropdown.classList.toggle('visible');
-    });
-  });
 }
 function openModifyModal(uniqueId, isEditable) {
-  const dataSource = isEditable ? [...loadedData.pending, ...loadedData.deleted] : loadedData.sent;
-  const entry = dataSource.find(e => e['Unique ID'] === uniqueId);
-  if (!entry) {
-    alert("Entry not found.");
-    return;
-  }
-  const modalBody = document.getElementById('modal-body');
-  modalBody.innerHTML = '';
-  document.getElementById('modal-title').textContent = isEditable ? 'Modify Entry' : 'View Sent Entry';
-  document.getElementById('modal-actions').style.display = isEditable ? 'block' : 'none';
-  const headersForModal = isEditable ? draftHeaders : approvalHeaders;
-  headersForModal.forEach(header => {
-    const isFieldReadOnly = !isEditable || header === 'Unique ID';
-    const value = entry[header] || '';
-    modalBody.innerHTML += `<label for="modal-${header}">${header}</label><input type="text" id="modal-${header}" name="${header}" value="${value}" ${isFieldReadOnly ? 'readonly' : ''} style="${isFieldReadOnly ? 'background-color:#e9ecef;' : ''}">`;
-  });
-  openModal('modify-modal');
+    const dataSource = isEditable ? [...loadedData.pending, ...loadedData.deleted] : loadedData.sent;
+    const entry = dataSource.find(e => e['Unique ID'] === uniqueId);
+    if (!entry) {
+        alert("Entry not found.");
+        return;
+    }
+    const modalBody = document.getElementById('modal-body');
+    modalBody.innerHTML = '';
+    document.getElementById('modal-title').textContent = isEditable ? 'Modify Entry' : 'View Sent Entry';
+    document.getElementById('modal-actions').style.display = isEditable ? 'block' : 'none';
+    const headersForModal = isEditable ? draftHeaders : approvalHeaders;
+    headersForModal.forEach(header => {
+        const isFieldReadOnly = !isEditable || header === 'Unique ID';
+        const value = entry[header] || '';
+        modalBody.innerHTML += `<label for="modal-${header}">${header}</label><input type="text" id="modal-${header}" name="${header}" value="${value}" ${isFieldReadOnly ? 'readonly' : ''} style="${isFieldReadOnly ? 'background-color:#e9ecef;' : ''}">`;
+    });
+    openModal('modify-modal');
 }
 
 async function openPayModal(uniqueId) {
@@ -676,6 +693,10 @@ async function openPayModal(uniqueId) {
                 <div class="pay-remarks-label">Final Approval Remarks</div>
                 <div class="pay-remarks-text">${entry['Final Approval Remarks'] || 'No remarks.'}</div>
             </div>
+            <div class="pay-remarks">
+                <div class="pay-remarks-label">Payer Remark</div>
+                <div class="pay-remarks-text">${entry['Payer Remark'] || 'No Payer remark yet.'}</div>
+            </div>
         </div>
         <div style="margin-top: 20px; text-align: right;">
             <p><b>Final Amount Payable:</b> ${entry['FinalAmountPayable'] || 'N/A'}</p>
@@ -684,36 +705,13 @@ async function openPayModal(uniqueId) {
 }
 
 function showLoader() {
-  ['pending','sent','deleted','readytopay','approved'].forEach(type => {
-    document.getElementById(`${type}-loader`).style.display = 'block';
-    document.getElementById(`${type}-table`).style.display = 'none';
-    document.getElementById(`no-${type}`).style.display = 'none';
-    document.getElementById(`${type}-pagination`).style.display = 'none';
-  });
+    ['pending','sent','deleted','readytopay','approved'].forEach(type => {
+        document.getElementById(`${type}-loader`).style.display = 'block';
+        document.getElementById(`${type}-table`).style.display = 'none';
+        document.getElementById(`no-${type}`).style.display = 'none';
+        document.getElementById(`${type}-pagination`).style.display = 'none';
+    });
 }
-    
- updatePayStatusWithRemark(uniqueId, newStatus) {
-        let payerRemark = '';
-        if (newStatus === 'Pending') { // Only ask for remark if changing to Pending
-             payerRemark = prompt("Please enter a remark for this action:");
-             if (payerRemark === null) { // User clicked cancel
-                 return;
-             }
-        }
-       
-        if (confirm(`Are you sure you want to change the status to '${newStatus}'?`)) {
-            showLoader();
-            // Call the modified Apps Script function with the remark
-            const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, payerRemark]);
-            if (response.success) {
-                alert(response.message);
-                fetchAndRenderData(); // Re-fetch and render to update the table
-            } else {
-                alert("Error: " + response.message);
-                showLoader(false);
-            }
-        }
-    }
 </script>
 </body>
 </html>
