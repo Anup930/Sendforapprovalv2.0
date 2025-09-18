@@ -120,6 +120,10 @@ tbody tr:hover { background-color: #e9ebee; }
     white-space: pre-wrap;
 }
 </style>
+<!-- Include jsPDF library (replace with a CDN if hosting online) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Include jspdf-autotable plugin for easy table generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div class="sidebar">
@@ -176,6 +180,8 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Ready to Pay Entries</h2>
 <div class="header-controls">
+<!-- NEW: PDF Download Button -->
+<button class="action-btn" style="background-color:#dc3545;" onclick="downloadReadyToPayPdf()">Download PDF</button>
 <div class="column-selector" id="readytopay-selector"></div>
 <div id="readytopay-pagination" class="pagination-controls" style="display:none;"></div>
 </div>
@@ -455,9 +461,12 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
 
     const headerRow = document.createElement('tr');
     let headerHtml = '';
-    if (tableType === 'sent') {
-        headerHtml += '<th><input type="checkbox" id="select-all-sent"></th>';
+    
+    // NEW: Checkbox for 'sent' and 'readytopay' sections
+    if (tableType === 'sent' || tableType === 'readytopay') {
+        headerHtml += `<th><input type="checkbox" id="select-all-${tableType}"></th>`;
     }
+    
     headerHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
     if (tableType === 'pending' || tableType === 'sent' || tableType === 'readytopay' || tableType === 'approved') headerHtml += '<th>Actions</th>';
     headerRow.innerHTML = headerHtml;
@@ -478,13 +487,19 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         };
 
         let rowHtml = '';
+        // NEW: Checkbox for 'sent' and 'readytopay' sections
         if (tableType === 'sent') {
             const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
             const isApproved = finalStatus === 'approved';
             rowHtml += `<td onclick="event.stopPropagation()">
-                <input type="checkbox" data-unique-id="${uniqueId}" ${isApproved ? '' : 'disabled'}>
+                <input type="checkbox" data-unique-id="${uniqueId}" ${isApproved ? '' : 'disabled'} class="row-checkbox-${tableType}">
+            </td>`;
+        } else if (tableType === 'readytopay') {
+             rowHtml += `<td onclick="event.stopPropagation()">
+                <input type="checkbox" data-unique-id="${uniqueId}" class="row-checkbox-${tableType}">
             </td>`;
         }
+
 
         rowHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
         
@@ -521,23 +536,26 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         tbody.appendChild(row);
     });
     
-    // Add "select all" functionality
-    if (tableType === 'sent') {
-        const selectAllCheckbox = document.getElementById('select-all-sent');
+    // Add "select all" functionality for 'sent' and 'readytopay'
+    if (tableType === 'sent' || tableType === 'readytopay') {
+        const selectAllCheckbox = document.getElementById(`select-all-${tableType}`);
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', (e) => {
-                const checkboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:not(:disabled)');
+                const checkboxes = document.querySelectorAll(`#${tableType}-table tbody input[type="checkbox"]:not(:disabled)`);
                 checkboxes.forEach(cb => {
                     cb.checked = e.target.checked;
                 });
-                toggleBulkPayButton();
+                if (tableType === 'sent') toggleBulkPayButton(); // Only for sent section
             });
         }
         
-        // Add event listener to each row checkbox to toggle button visibility
-        const rowCheckboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]');
+        // Add event listener to each row checkbox to toggle button visibility (for sent)
+        // Or for other future needs for readytopay section
+        const rowCheckboxes = document.querySelectorAll(`#${tableType}-table tbody input[type="checkbox"]`);
         rowCheckboxes.forEach(cb => {
-            cb.addEventListener('change', toggleBulkPayButton);
+            cb.addEventListener('change', () => {
+                if (tableType === 'sent') toggleBulkPayButton();
+            });
         });
     }
 
