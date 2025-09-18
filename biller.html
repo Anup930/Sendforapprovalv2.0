@@ -1,4 +1,5 @@
-<!-- V.5.9 -->
+<!-- v.6.1 -->
+
 
 <!DOCTYPE html>
 <html>
@@ -120,6 +121,8 @@ tbody tr:hover { background-color: #e9ebee; }
     white-space: pre-wrap;
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div class="sidebar">
@@ -176,6 +179,7 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Ready to Pay Entries</h2>
 <div class="header-controls">
+<button id="download-pdf-btn" class="action-btn" onclick="downloadPdf()">Download PDF</button>
 <div class="column-selector" id="readytopay-selector"></div>
 <div id="readytopay-pagination" class="pagination-controls" style="display:none;"></div>
 </div>
@@ -371,7 +375,6 @@ async function sendMultipleToPay() {
     }
 }
 
-// Function to handle adding a single item to the pay list
 async function addInPay(uniqueId) {
     if (confirm(`Are you sure you want to add this approved entry to the 'Ready to Pay' list?`)) {
         showLoader();
@@ -455,13 +458,11 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     table.style.display = 'table';
     paginationContainer.style.display = 'flex';
 
-    // --- MODIFIED SECTION FOR BULK BUTTON VISIBILITY ---
     if(tableType === 'sent') {
-        toggleBulkPayButton(); // Call to set initial state based on selected checkboxes
+        toggleBulkPayButton();
     } else {
         document.getElementById('bulk-pay-btn').style.display = 'none';
     }
-    // --- END MODIFIED SECTION ---
 
     const totalEntries = data.length;
     const totalPages = Math.ceil(totalEntries / entriesPerPage);
@@ -471,8 +472,8 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
 
     const headerRow = document.createElement('tr');
     let headerHtml = '';
-    if (tableType === 'sent') {
-        headerHtml += '<th><input type="checkbox" id="select-all-sent"></th>';
+    if (tableType === 'sent' || tableType === 'readytopay') {
+        headerHtml += '<th><input type="checkbox" id="select-all-' + tableType + '"></th>';
     }
     headerHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<th>${h}</th>`).join('');
     if (tableType === 'pending' || tableType === 'sent' || tableType === 'readytopay' || tableType === 'approved') headerHtml += '<th>Actions</th>';
@@ -494,11 +495,10 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         };
 
         let rowHtml = '';
-        if (tableType === 'sent') {
-            const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
-            const isApproved = finalStatus === 'approved';
+        if (tableType === 'sent' || tableType === 'readytopay') {
+            const isApproved = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() === 'approved' : false;
             rowHtml += `<td onclick="event.stopPropagation()">
-                <input type="checkbox" data-unique-id="${uniqueId}" ${isApproved ? '' : 'disabled'}>
+                <input type="checkbox" data-unique-id="${uniqueId}" ${tableType === 'sent' && !isApproved ? 'disabled' : ''}>
             </td>`;
         }
 
@@ -537,26 +537,25 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         tbody.appendChild(row);
     });
     
-    // Add "select all" functionality
-    if (tableType === 'sent') {
-        const selectAllCheckbox = document.getElementById('select-all-sent');
+    if (tableType === 'sent' || tableType === 'readytopay') {
+        const selectAllCheckbox = document.getElementById('select-all-' + tableType);
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', (e) => {
-                const checkboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:not(:disabled)');
+                const checkboxes = document.querySelectorAll(`#${tableType}-table tbody input[type="checkbox"]:not(:disabled)`);
                 checkboxes.forEach(cb => {
                     cb.checked = e.target.checked;
                 });
-                toggleBulkPayButton();
+                if(tableType === 'sent') toggleBulkPayButton();
             });
         }
         
-        // Add event listener to each row checkbox to toggle button visibility
-        const rowCheckboxes = document.querySelectorAll('#sent-table tbody input[type="checkbox"]');
+        const rowCheckboxes = document.querySelectorAll(`#${tableType}-table tbody input[type="checkbox"]`);
         rowCheckboxes.forEach(cb => {
-            cb.addEventListener('change', toggleBulkPayButton);
+            cb.addEventListener('change', () => {
+                if(tableType === 'sent') toggleBulkPayButton();
+            });
         });
     }
-
 
     const prevButton = document.createElement('button');
     prevButton.textContent = 'Previous';
@@ -598,7 +597,6 @@ function changeEntriesPerPage(tableType, newEntriesPerPage) {
     renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
 }
 
-// NEW FUNCTION: Toggles the visibility of the bulk pay button
 function toggleBulkPayButton() {
     const checkedCount = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:checked').length;
     const bulkPayBtn = document.getElementById('bulk-pay-btn');
@@ -729,6 +727,50 @@ function showLoader() {
         document.getElementById(`no-${type}`).style.display = 'none';
         document.getElementById(`${type}-pagination`).style.display = 'none';
     });
+}
+
+async function downloadPdf() {
+    const { jsPDF } = window.jspdf;
+    const table = document.getElementById('readytopay-table');
+    const checkboxes = table.querySelectorAll('tbody input[type="checkbox"]:checked');
+    
+    if (checkboxes.length === 0) {
+        alert("Please select at least one entry to download.");
+        return;
+    }
+    
+    const doc = new jsPDF();
+    
+    const visibleHeaders = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText).filter(text => text !== '');
+    
+    const rows = [];
+    checkboxes.forEach(cb => {
+        const row = cb.closest('tr');
+        const rowData = [];
+        Array.from(row.querySelectorAll('td')).forEach((td, index) => {
+            if (index > 0) { // Skip the checkbox column
+                rowData.push(td.innerText);
+            }
+        });
+        rows.push(rowData);
+    });
+    
+    doc.autoTable({
+        head: [visibleHeaders.slice(1)], // Skip the first header (for the checkbox column)
+        body: rows,
+        startY: 20,
+        styles: {
+            fontSize: 8,
+            cellPadding: 2,
+        },
+        headStyles: {
+            fillColor: [108, 117, 125],
+            textColor: [255, 255, 255],
+        },
+        theme: 'striped',
+    });
+    
+    doc.save('ready_to_pay.pdf');
 }
 </script>
 </body>
