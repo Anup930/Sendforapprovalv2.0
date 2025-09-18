@@ -482,11 +482,9 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     rowHtml += visibleCols.filter(h => headersToUse.includes(h)).map(h => `<td>${entry[h] || ''}</td>`).join('');
     
     if (tableType === 'pending') {
-      rowHtml += `<td onclick="event.stopPropagation()">
-        <button class="action-btn modify-btn" onclick="openModifyModal('${uniqueId}', true)">Modify</button>
-        <button class="action-btn send-btn" onclick="updateStatus('${uniqueId}', 'sent')">Send</button>
-        <button class="action-btn delete-btn" onclick="updateStatus('${uniqueId}', 'Delete')">Delete</button>
-      </td>`;
+    rowHtml += `<td onclick="event.stopPropagation()">
+      <button class="action-btn add-pay-btn" onclick="updatePayStatusWithRemark('${uniqueId}', 'Pending')">Send for Pay</button>
+    </td>`;
     } else if (tableType === 'sent') {
       const finalStatus = entry['Final Approval Status'] ? entry['Final Approval Status'].toString().toLowerCase() : '';
       const isApproved = finalStatus === 'approved';
