@@ -1,5 +1,3 @@
-<!-- v.6.2 -->
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -740,16 +738,18 @@ async function downloadPdf() {
     
     const doc = new jsPDF();
     
-    // Get visible headers from the table and exclude the first header (checkbox column)
-    const visibleHeaders = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText).filter(text => text !== '').slice(1);
+    // Get visible headers from the table and exclude the checkbox and Actions columns
+    const allHeaders = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+    const visibleHeaders = allHeaders.filter(header => header !== '' && header !== 'Actions');
     
     const rows = [];
     checkboxes.forEach(cb => {
         const row = cb.closest('tr');
         const rowData = [];
         Array.from(row.querySelectorAll('td')).forEach((td, index) => {
-            if (index > 0) { // Skip the first column (checkbox)
-                rowData.push(td.innerText);
+            // Only push data for the columns that are in our visibleHeaders list
+            if (index > 0 && index < (row.cells.length - 1)) {
+                rowData.push(td.innerText.trim());
             }
         });
         rows.push(rowData);
