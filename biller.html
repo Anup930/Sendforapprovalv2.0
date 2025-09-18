@@ -495,7 +495,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
       </td>`;
     } else if (tableType === 'readytopay' || tableType === 'approved') {
         rowHtml += `<td onclick="event.stopPropagation()">
-          <button class="action-btn add-pay-btn" onclick="openPayModal('${uniqueId}')">See Pay</button>
+          <button class="action-btn add-pay-btn" onclick="openPayModal('${uniqueId}')">Send for Pay</button>
         </td>`;
     }
 
