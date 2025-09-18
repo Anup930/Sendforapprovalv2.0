@@ -691,6 +691,29 @@ function showLoader() {
     document.getElementById(`${type}-pagination`).style.display = 'none';
   });
 }
+    
+ updatePayStatusWithRemark(uniqueId, newStatus) {
+        let payerRemark = '';
+        if (newStatus === 'Pending') { // Only ask for remark if changing to Pending
+             payerRemark = prompt("Please enter a remark for this action:");
+             if (payerRemark === null) { // User clicked cancel
+                 return;
+             }
+        }
+       
+        if (confirm(`Are you sure you want to change the status to '${newStatus}'?`)) {
+            showLoader();
+            // Call the modified Apps Script function with the remark
+            const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, payerRemark]);
+            if (response.success) {
+                alert(response.message);
+                fetchAndRenderData(); // Re-fetch and render to update the table
+            } else {
+                alert("Error: " + response.message);
+                showLoader(false);
+            }
+        }
+    }
 </script>
 </body>
 </html>
