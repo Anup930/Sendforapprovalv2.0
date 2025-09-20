@@ -48,7 +48,8 @@
         .detail-form label { display: block; margin-bottom: 5px; font-weight: bold; }
         .detail-form input[type="text"],
         .detail-form input[type="number"],
-        .detail-form textarea {
+        .detail-form textarea,
+        .detail-form input[type="file"] { /* Added file input */
             width: calc(100% - 22px); /* Adjust for padding and border */
             padding: 10px;
             margin-bottom: 15px;
@@ -156,8 +157,9 @@
                 <label for="transaction-id">Transaction ID:</label>
                 <input type="text" id="transaction-id" placeholder="Enter transaction ID">
                 
-                <label for="bill-link">Bill Link:</label>
-                <input type="text" id="bill-link" placeholder="Enter bill link">
+                <label for="bill-file">Attach Bill File:</label>
+                <input type="file" id="bill-file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                <p id="bill-file-name" style="font-size: 0.9em; color: #555; margin-top: 5px;"></p>
             </div>
             
             <button id="submit-status-action">Submit</button>
@@ -172,13 +174,28 @@
     let currentActionEntryId = null;
     let currentActionStatus = null;
 
-    async function callAppsScript(functionName, params = []) {
+    async function callAppsScript(functionName, params = [], file = null) {
         const requestData = { action: functionName, params: params };
+
+        let payload;
+        if (file) {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            await new Promise(resolve => reader.onload = () => resolve());
+            
+            const base64Data = reader.result.split(',')[1];
+            requestData.file = {
+                name: file.name,
+                type: file.type,
+                data: base64Data
+            };
+        }
+
         try {
             const response = await fetch(SCRIPT_URL, {
                 method: 'POST',
                 body: JSON.stringify(requestData),
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' } // Important for Apps Script to parse JSON
             });
             if (!response.ok) {
                 throw new Error(`Network response was not ok: ${response.statusText}`);
@@ -205,6 +222,16 @@
 
         // Add event listener for the submit button in the new modal
         document.getElementById('submit-status-action').addEventListener('click', handleSubmitStatusAction);
+
+        // Add event listener for file input to display selected file name
+        document.getElementById('bill-file').addEventListener('change', function() {
+            const fileNameDisplay = document.getElementById('bill-file-name');
+            if (this.files.length > 0) {
+                fileNameDisplay.textContent = `Selected: ${this.files[0].name}`;
+            } else {
+                fileNameDisplay.textContent = '';
+            }
+        });
     });
 
     function logoutUser() {
@@ -299,7 +326,8 @@
             document.getElementById('bill-remark').value = '';
             document.getElementById('pay-amount').value = '';
             document.getElementById('transaction-id').value = '';
-            document.getElementById('bill-link').value = '';
+            document.getElementById('bill-file').value = ''; // Clear file input
+            document.getElementById('bill-file-name').textContent = ''; // Clear file name display
             document.getElementById('complete-fields').style.display = 'none';
         }
     }
@@ -378,12 +406,15 @@
         document.getElementById('status-action-title').textContent = `${status} Payment`;
         document.getElementById('bill-remark').value = ''; // Clear previous remarks
         document.getElementById('complete-fields').style.display = 'none'; // Hide by default
+        document.getElementById('bill-file').value = ''; // Clear file input
+        document.getElementById('bill-file-name').textContent = ''; // Clear file name display
+
 
         if (status === 'Completed') {
             document.getElementById('complete-fields').style.display = 'block';
             document.getElementById('pay-amount').value = '';
             document.getElementById('transaction-id').value = '';
-            document.getElementById('bill-link').value = '';
+            // No need to clear bill-link here, it's now a file input handled above
         }
 
         openModal('status-action-modal');
@@ -397,15 +428,16 @@
 
         let payAmount = '';
         let transactionId = '';
-        let billLink = '';
+        let billFile = null; // Changed from billLink to billFile
 
         if (newStatus === 'Completed') {
             payAmount = document.getElementById('pay-amount').value;
             transactionId = document.getElementById('transaction-id').value;
-            billLink = document.getElementById('bill-link').value;
+            const billFileInput = document.getElementById('bill-file');
+            billFile = billFileInput.files[0]; // Get the selected file
 
-            if (!billRemark || !payAmount || !transactionId || !billLink) {
-                alert('Please fill in all required fields for "Complete" action.');
+            if (!billRemark || !payAmount || !transactionId || !billFile) { // Check for billFile
+                alert('Please fill in all required fields and attach a bill file for "Complete" action.');
                 return;
             }
         } else {
@@ -418,7 +450,8 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Submitting...';
 
-        const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, billRemark, payAmount, transactionId, billLink]);
+        // Modified callAppsScript to pass the file as the last argument
+        const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, billRemark, payAmount, transactionId], billFile);
         
         submitBtn.disabled = false;
         submitBtn.textContent = 'Submit';
