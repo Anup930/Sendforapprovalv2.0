@@ -43,6 +43,37 @@
         .pay-remarks { grid-column: 1 / -1; margin-top: 15px; padding: 15px; border: 1px solid #ccc; border-radius: 6px; }
         .pay-remarks-label { font-weight: bold; margin-bottom: 5px; }
         .pay-remarks-text { color: #555; font-size: 0.9em; white-space: pre-wrap; }
+
+        /* New styles for remark/detail modal */
+        .detail-form label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .detail-form input[type="text"],
+        .detail-form input[type="number"],
+        .detail-form textarea {
+            width: calc(100% - 22px); /* Adjust for padding and border */
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        .detail-form textarea { resize: vertical; min-height: 80px; }
+        .detail-form button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        .detail-form button:hover {
+            background-color: #0056b3;
+        }
+        .detail-form button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -109,10 +140,37 @@
     </div>
 </div>
 
+<!-- New Modal for Status Actions -->
+<div id="status-action-modal" class="modal-overlay">
+    <div class="modal-content">
+        <button class="modal-close-btn" onclick="closeModal('status-action-modal')">&times;</button>
+        <h2 id="status-action-title"></h2>
+        <div class="detail-form">
+            <label for="bill-remark">Bill Remark:</label>
+            <textarea id="bill-remark" placeholder="Enter remarks..."></textarea>
+
+            <div id="complete-fields" style="display: none;">
+                <label for="pay-amount">Pay Amount:</label>
+                <input type="number" id="pay-amount" placeholder="Enter pay amount">
+                
+                <label for="transaction-id">Transaction ID:</label>
+                <input type="text" id="transaction-id" placeholder="Enter transaction ID">
+                
+                <label for="bill-link">Bill Link:</label>
+                <input type="text" id="bill-link" placeholder="Enter bill link">
+            </div>
+            
+            <button id="submit-status-action">Submit</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJUyYMUqE29p594h6WHnh7OIuiw7g69J3OdTaJRrN9wYTDv3OQPQeGIdE6HDkItQLy7A/exec";
     const PAYER_HEADERS = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status'];
     let loadedData = {};
+    let currentActionEntryId = null;
+    let currentActionStatus = null;
 
     async function callAppsScript(functionName, params = []) {
         const requestData = { action: functionName, params: params };
@@ -144,6 +202,9 @@
         document.getElementById('welcome-message').textContent += ` (Welcome, ${currentUser})`;
         fetchAndRenderData();
         showSection('pending');
+
+        // Add event listener for the submit button in the new modal
+        document.getElementById('submit-status-action').addEventListener('click', handleSubmitStatusAction);
     });
 
     function logoutUser() {
@@ -171,20 +232,6 @@
         } else {
             alert('Failed to load data.');
             showLoader(false); // Hide all loaders
-        }
-    }
-
-    async function updatePayStatus(uniqueId, newStatus) {
-        if (confirm(`Are you sure you want to change the status to '${newStatus}'?`)) {
-            showLoader();
-            const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus]);
-            if (response.success) {
-                alert(response.message);
-                fetchAndRenderData();
-            } else {
-                alert("Error: " + response.message);
-                showLoader(false);
-            }
         }
     }
 
@@ -231,9 +278,9 @@
             
             if (tableType === 'pending') {
                 rowHtml += `<td onclick="event.stopPropagation()">
-                    <button class="action-btn complete-btn" onclick="updatePayStatus('${uniqueId}', 'Completed')">Complete</button>
-                    <button class="action-btn reject-btn" onclick="updatePayStatus('${uniqueId}', 'Rejected')">Reject</button>
-                    <button class="action-btn hold-btn" onclick="updatePayStatus('${uniqueId}', 'Hold')">Hold</button>
+                    <button class="action-btn complete-btn" onclick="openStatusActionModal('${uniqueId}', 'Completed')">Complete</button>
+                    <button class="action-btn reject-btn" onclick="openStatusActionModal('${uniqueId}', 'Rejected')">Reject</button>
+                    <button class="action-btn hold-btn" onclick="openStatusActionModal('${uniqueId}', 'Hold')">Hold</button>
                 </td>`;
             }
             row.innerHTML = rowHtml;
@@ -247,6 +294,14 @@
 
     function closeModal(modalId) {
         document.getElementById(modalId).style.display = 'none';
+        // Clear forms when closing the status action modal
+        if (modalId === 'status-action-modal') {
+            document.getElementById('bill-remark').value = '';
+            document.getElementById('pay-amount').value = '';
+            document.getElementById('transaction-id').value = '';
+            document.getElementById('bill-link').value = '';
+            document.getElementById('complete-fields').style.display = 'none';
+        }
     }
 
     async function openPayModal(uniqueId) {
@@ -292,6 +347,23 @@
                     <div class="pay-remarks-label">Final Approval Remarks</div>
                     <div class="pay-remarks-text">${entry['Final Approval Remarks'] || 'No remarks.'}</div>
                 </div>
+                <!-- Display Payer-added details if available -->
+                <div class="pay-remarks">
+                    <div class="pay-remarks-label">Bill Remark</div>
+                    <div class="pay-remarks-text">${entry['Bill Remark'] || 'N/A'}</div>
+                </div>
+                <div class="pay-remarks">
+                    <div class="pay-remarks-label">Pay Amount</div>
+                    <div class="pay-remarks-text">${entry['Pay Amount'] || 'N/A'}</div>
+                </div>
+                <div class="pay-remarks">
+                    <div class="pay-remarks-label">Transaction ID</div>
+                    <div class="pay-remarks-text">${entry['Transaction id'] || 'N/A'}</div>
+                </div>
+                <div class="pay-remarks">
+                    <div class="pay-remarks-label">Bill Link</div>
+                    <div class="pay-remarks-text"><a href="${entry['Bill link'] || '#'}" target="_blank">${entry['Bill link'] ? 'View Bill' : 'N/A'}</a></div>
+                </div>
             </div>
             <div style="margin-top: 20px; text-align: right;">
                 <p><b>Final Amount Payable:</b> ${entry['FinalAmountPayable'] || 'N/A'}</p>
@@ -299,17 +371,76 @@
         `;
     }
 
+    function openStatusActionModal(uniqueId, status) {
+        currentActionEntryId = uniqueId;
+        currentActionStatus = status;
+
+        document.getElementById('status-action-title').textContent = `${status} Payment`;
+        document.getElementById('bill-remark').value = ''; // Clear previous remarks
+        document.getElementById('complete-fields').style.display = 'none'; // Hide by default
+
+        if (status === 'Completed') {
+            document.getElementById('complete-fields').style.display = 'block';
+            document.getElementById('pay-amount').value = '';
+            document.getElementById('transaction-id').value = '';
+            document.getElementById('bill-link').value = '';
+        }
+
+        openModal('status-action-modal');
+    }
+
+    async function handleSubmitStatusAction() {
+        const uniqueId = currentActionEntryId;
+        const newStatus = currentActionStatus;
+        const billRemark = document.getElementById('bill-remark').value;
+        const submitBtn = document.getElementById('submit-status-action');
+
+        let payAmount = '';
+        let transactionId = '';
+        let billLink = '';
+
+        if (newStatus === 'Completed') {
+            payAmount = document.getElementById('pay-amount').value;
+            transactionId = document.getElementById('transaction-id').value;
+            billLink = document.getElementById('bill-link').value;
+
+            if (!billRemark || !payAmount || !transactionId || !billLink) {
+                alert('Please fill in all required fields for "Complete" action.');
+                return;
+            }
+        } else {
+             if (!billRemark) {
+                alert('Please enter a remark for this action.');
+                return;
+            }
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, billRemark, payAmount, transactionId, billLink]);
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit';
+
+        if (response.success) {
+            alert(response.message);
+            closeModal('status-action-modal');
+            fetchAndRenderData(); // Refresh data after update
+        } else {
+            alert("Error: " + response.message);
+        }
+    }
+
     function showLoader(isVisible = true) {
         const loaderStyle = isVisible ? 'block' : 'none';
-        const tableStyle = isVisible ? 'none' : 'table';
-        const noDataStyle = isVisible ? 'none' : 'block';
+        const tableStyle = isVisible ? 'none' : 'table'; // Hide tables when loading
+        const noDataStyle = isVisible ? 'none' : 'block'; // Hide 'no data' messages when loading
 
         ['pending', 'paid', 'rejected', 'hold'].forEach(type => {
             document.getElementById(`${type}-loader`).style.display = loaderStyle;
-            if (isVisible) {
-                document.getElementById(`${type}-table`).style.display = tableStyle;
-                document.getElementById(`no-${type}`).style.display = noDataStyle;
-            }
+            document.getElementById(`${type}-table`).style.display = isVisible ? 'none' : ''; // Use '' to revert to default display (table)
+            document.getElementById(`no-${type}`).style.display = isVisible ? 'none' : ''; // Use '' to revert to default display (block)
         });
     }
 
