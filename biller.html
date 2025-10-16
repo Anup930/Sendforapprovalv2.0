@@ -1,4 +1,4 @@
-<!-- biller -->
+<!-- biller.html V2 Downlode in excel, pdf, text -->
 
 <!DOCTYPE html>
 <html>
@@ -119,9 +119,44 @@ tbody tr:hover { background-color: #e9ebee; }
     font-size: 0.9em;
     white-space: pre-wrap;
 }
+
+/* --- NEW CSS FOR DOWNLOAD DROPDOWN --- */
+.download-dropdown {
+    position: relative;
+    display: inline-block;
+}
+.download-main-btn {
+    background-color: #f0f2f5;
+    border: 1px solid #ccc;
+}
+.download-options {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 100;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.download-options a {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    font-size: 14px;
+}
+.download-options a:hover {
+    background-color: #ddd;
+}
+.download-dropdown:hover .download-options {
+    display: block;
+}
+/* --- END NEW CSS --- */
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="sidebar">
@@ -178,9 +213,16 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Ready to Pay Entries</h2>
 <div class="header-controls">
-<button id="download-pdf-btn" class="action-btn" onclick="downloadPdf()" style="color: black;" >Download PDF</button>
-<div class="column-selector" id="readytopay-selector"></div>
-<div id="readytopay-pagination" class="pagination-controls" style="display:none;"></div>
+    <div class="download-dropdown">
+        <button class="action-btn download-main-btn" style="color: black;">Download As...</button>
+        <div class="download-options">
+            <a href="#" onclick="downloadData('pdf')">PDF</a>
+            <a href="#" onclick="downloadData('excel')">Excel (.xlsx)</a>
+            <a href="#" onclick="downloadData('text')">Text (.csv)</a>
+        </div>
+    </div>
+    <div class="column-selector" id="readytopay-selector"></div>
+    <div id="readytopay-pagination" class="pagination-controls" style="display:none;"></div>
 </div>
 </div>
 <div id="readytopay-loader" class="loader">Loading...</div>
@@ -728,52 +770,101 @@ function showLoader() {
     });
 }
 
-async function downloadPdf() {
-    const { jsPDF } = window.jspdf;
+// --- NEW DOWNLOAD FUNCTIONS (REPLACES old downloadPdf) ---
+
+function getSelectedDownloadData() {
     const table = document.getElementById('readytopay-table');
     const checkboxes = table.querySelectorAll('tbody input[type="checkbox"]:checked');
     
     if (checkboxes.length === 0) {
         alert("Please select at least one entry to download.");
-        return;
+        return null;
     }
-    
-    const doc = new jsPDF();
-    
-    // Get visible headers from the table and exclude the checkbox and Actions columns
+
     const allHeaders = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
     const visibleHeaders = allHeaders.filter(header => header !== '' && header !== 'Actions');
     
-    const rows = [];
-    checkboxes.forEach(cb => {
+    const data = Array.from(checkboxes).map(cb => {
         const row = cb.closest('tr');
-        const rowData = [];
-        Array.from(row.querySelectorAll('td')).forEach((td, index) => {
-            // Only push data for the columns that are in our visibleHeaders list
-            if (index > 0 && index < (row.cells.length - 1)) {
-                rowData.push(td.innerText.trim());
+        const entry = {};
+        // Start from index 1 to skip checkbox, end before Actions column
+        for (let i = 0; i < visibleHeaders.length; i++) {
+            const header = visibleHeaders[i];
+            const cell = row.cells[i + 1]; // +1 to offset the checkbox cell
+            if (cell) {
+                entry[header] = cell.innerText.trim();
             }
-        });
-        rows.push(rowData);
+        }
+        return entry;
     });
-    
+
+    return { headers: visibleHeaders, data: data };
+}
+
+function downloadData(format) {
+    const selected = getSelectedDownloadData();
+    if (!selected) return; // No data selected
+
+    switch (format) {
+        case 'pdf':
+            downloadAsPdf(selected.headers, selected.data);
+            break;
+        case 'excel':
+            downloadAsExcel(selected.data);
+            break;
+        case 'text':
+            downloadAsTextCsv(selected.headers, selected.data);
+            break;
+    }
+}
+
+function downloadAsPdf(headers, data) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const bodyData = data.map(row => headers.map(header => row[header] || ''));
+
     doc.autoTable({
-        head: [visibleHeaders], 
-        body: rows,
+        head: [headers],
+        body: bodyData,
         startY: 20,
-        styles: {
-            fontSize: 8,
-            cellPadding: 2,
-        },
-        headStyles: {
-            fillColor: [108, 117, 125],
-            textColor: [255, 255, 255],
-        },
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [108, 117, 125] },
         theme: 'striped',
     });
     
     doc.save('ready_to_pay.pdf');
 }
+
+function downloadAsExcel(data) {
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "ReadyToPay");
+    XLSX.writeFile(workbook, "ready_to_pay.xlsx");
+}
+
+function downloadAsTextCsv(headers, data) {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += headers.join(",") + "\r\n"; // Add header row
+
+    data.forEach(row => {
+        let rowArray = headers.map(header => {
+            let cell = row[header] || '';
+            // Escape commas by enclosing in double quotes
+            return `"${cell.replace(/"/g, '""')}"`; 
+        });
+        csvContent += rowArray.join(",") + "\r\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "ready_to_pay.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// --- END NEW DOWNLOAD FUNCTIONS ---
 </script>
 </body>
 </html>
