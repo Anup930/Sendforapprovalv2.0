@@ -1,5 +1,3 @@
-<!-- Biller.html, Excel, Pdf, csv, filter -->
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -190,9 +188,18 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Sent for Approval</h2>
 <div class="header-controls">
-<button id="bulk-pay-btn" class="action-btn" onclick="sendMultipleToPay()" style="display:none;">Add Selected to Pay</button>
-<div class="column-selector" id="sent-selector"></div>
-<div id="sent-pagination" class="pagination-controls" style="display:none;"></div>
+    <div class="status-filter-container">
+        <label for="sent-status-filter" style="font-weight: bold; margin-right: 5px;">Status:</label>
+        <select id="sent-status-filter" onchange="renderFilteredSentData()">
+            <option value="All">All</option>
+            <option value="Approved">Approved</option>
+            <option value="Pending">Pending</option>
+            <option value="Rejected">Rejected</option>
+        </select>
+    </div>
+    <button id="bulk-pay-btn" class="action-btn" onclick="sendMultipleToPay()" style="display:none;">Add Selected to Pay</button>
+    <div class="column-selector" id="sent-selector"></div>
+    <div id="sent-pagination" class="pagination-controls" style="display:none;"></div>
 </div>
 </div>
 <div id="sent-loader" class="loader">Loading...</div>
@@ -215,15 +222,6 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Ready to Pay Entries</h2>
 <div class="header-controls">
-    <div class="status-filter-container">
-        <label for="readytopay-status-filter" style="font-weight: bold; margin-right: 5px;">Status:</label>
-        <select id="readytopay-status-filter" onchange="renderFilteredReadyToPay()">
-            <option value="All">All</option>
-            <option value="Approved">Approved</option>
-            <option value="Pending">Pending</option>
-            <option value="Rejected">Rejected</option>
-        </select>
-    </div>
     <div class="download-dropdown">
         <button class="action-btn download-main-btn" style="color: black;">Download As...</button>
         <div class="download-options">
@@ -358,12 +356,11 @@ async function fetchAndRenderData() {
 
         initializeColumnSelectors();
         renderTable('pending', loadedData.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
-        renderTable('sent', loadedData.sent, paginationState.sent.currentPage, paginationState.sent.entriesPerPage);
+        
+        renderFilteredSentData(); // Use filter for the "Sent" table
+        
         renderTable('deleted', loadedData.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
-        
-        // This function now handles the initial render for the "Ready to Pay" table
-        renderFilteredReadyToPay(); 
-        
+        renderTable('readytopay', loadedData.readytopay, paginationState.readytopay.currentPage, paginationState.readytopay.entriesPerPage);
         renderTable('approved', loadedData.approved, paginationState.approved.currentPage, paginationState.approved.entriesPerPage);
     } else {
         alert('Failed to load data: ' + data.message);
@@ -371,9 +368,10 @@ async function fetchAndRenderData() {
     }
 }
 
-function renderFilteredReadyToPay() {
-    const filterValue = document.getElementById('readytopay-status-filter').value;
-    const allData = loadedData.readytopay || [];
+// NEW function for filtering the SENT table
+function renderFilteredSentData() {
+    const filterValue = document.getElementById('sent-status-filter').value;
+    const allData = loadedData.sent || [];
     let filteredData = allData;
 
     const approvalCols = ['AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
@@ -394,8 +392,8 @@ function renderFilteredReadyToPay() {
         });
     }
 
-    paginationState.readytopay.currentPage = 1;
-    renderTable('readytopay', filteredData, 1, paginationState.readytopay.entriesPerPage);
+    paginationState.sent.currentPage = 1;
+    renderTable('sent', filteredData, 1, paginationState.sent.entriesPerPage);
 }
 
 
@@ -542,7 +540,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
 
     if(tableType === 'sent') {
         toggleBulkPayButton();
-    } else if (tableType !== 'readytopay') { // Hide bulk button for other tabs
+    } else {
         document.getElementById('bulk-pay-btn').style.display = 'none';
     }
 
@@ -567,7 +565,6 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         const row = document.createElement('tr');
         
         row.onclick = (e) => {
-            // Prevent row click from firing when clicking on interactive elements
             if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
 
             if (tableType === 'sent') {
@@ -645,7 +642,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     const prevButton = document.createElement('button');
     prevButton.textContent = 'Previous';
     prevButton.disabled = currentPage === 1;
-    prevButton.onclick = () => changePage(tableType, currentPage - 1, data); // Pass filtered data
+    prevButton.onclick = () => changePage(tableType, currentPage - 1, data);
     paginationContainer.appendChild(prevButton);
 
     const pageInfo = document.createElement('span');
@@ -656,7 +653,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     const nextButton = document.createElement('button');
     nextButton.textContent = 'Next';
     nextButton.disabled = currentPage === totalPages;
-    nextButton.onclick = () => changePage(tableType, currentPage + 1, data); // Pass filtered data
+    nextButton.onclick = () => changePage(tableType, currentPage + 1, data);
     paginationContainer.appendChild(nextButton);
 
     const perPageSelect = document.createElement('select');
@@ -667,17 +664,16 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         if (option === entriesPerPage) opt.selected = true;
         perPageSelect.appendChild(opt);
     });
-    perPageSelect.onchange = (e) => changeEntriesPerPage(tableType, parseInt(e.target.value), data); // Pass filtered data
+    perPageSelect.onchange = (e) => changeEntriesPerPage(tableType, parseInt(e.target.value), data);
     paginationContainer.appendChild(perPageSelect);
 }
 
-// Modified to accept the data source as an argument for filtering purposes
 function changePage(tableType, newPage, dataSource) {
     paginationState[tableType].currentPage = newPage;
-    renderTable(tableType, dataSource, newPage, paginationState[tableType].entriesPerPage);
+    const currentEntriesPerPage = paginationState[tableType].entriesPerPage;
+    renderTable(tableType, dataSource, newPage, currentEntriesPerPage);
 }
 
-// Modified to accept the data source as an argument
 function changeEntriesPerPage(tableType, newEntriesPerPage, dataSource) {
     paginationState[tableType].entriesPerPage = newEntriesPerPage;
     paginationState[tableType].currentPage = 1;
@@ -721,9 +717,9 @@ function initializeColumnSelectors() {
             optionDiv.querySelector('input').addEventListener('change', () => {
                 const newCols = Array.from(dropdown.querySelectorAll('input:checked')).map(cb => cb.value);
                 localStorage.setItem(storageKey, JSON.stringify(newCols));
-                // When columns change, we need to re-render with the currently active filter
-                if(tableType === 'readytopay') {
-                    renderFilteredReadyToPay();
+                
+                if(tableType === 'sent') {
+                    renderFilteredSentData(); // Re-render with filter
                 } else {
                     renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
                 }
