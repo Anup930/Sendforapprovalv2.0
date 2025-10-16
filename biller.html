@@ -1,4 +1,4 @@
-<!-- biller.html V2 Downlode in excel, pdf, text -->
+<!-- Biller.html, Excel, Pdf, csv, filter -->
 
 <!DOCTYPE html>
 <html>
@@ -23,15 +23,13 @@ table { border-collapse: collapse; width: 100%; background: #fff; box-shadow: 0 
 thead { background-color: #6c757d; color: white; }
 th, td { text-align: left; padding: 12px 15px; border-bottom: 1px solid #ddd; }
 
-/* --- NEW CSS FOR STICKY HEADER --- */
 table thead th {
     position: sticky;
     top: 0;
-    background-color: #6c757d; /* Match the current header background */
-    z-index: 10; /* Ensure it stays above other content */
-    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2); /* Optional: subtle shadow for depth */
+    background-color: #6c757d;
+    z-index: 10;
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
 }
-/* --- END NEW CSS --- */
 
 tbody tr { cursor: pointer; transition: background-color 0.2s; }
 tbody tr:hover { background-color: #e9ebee; }
@@ -120,7 +118,6 @@ tbody tr:hover { background-color: #e9ebee; }
     white-space: pre-wrap;
 }
 
-/* --- NEW CSS FOR DOWNLOAD DROPDOWN --- */
 .download-dropdown {
     position: relative;
     display: inline-block;
@@ -152,7 +149,12 @@ tbody tr:hover { background-color: #e9ebee; }
 .download-dropdown:hover .download-options {
     display: block;
 }
-/* --- END NEW CSS --- */
+.status-filter-container select {
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background-color: white;
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -213,6 +215,15 @@ tbody tr:hover { background-color: #e9ebee; }
 <div class="section-header">
 <h2>Ready to Pay Entries</h2>
 <div class="header-controls">
+    <div class="status-filter-container">
+        <label for="readytopay-status-filter" style="font-weight: bold; margin-right: 5px;">Status:</label>
+        <select id="readytopay-status-filter" onchange="renderFilteredReadyToPay()">
+            <option value="All">All</option>
+            <option value="Approved">Approved</option>
+            <option value="Pending">Pending</option>
+            <option value="Rejected">Rejected</option>
+        </select>
+    </div>
     <div class="download-dropdown">
         <button class="action-btn download-main-btn" style="color: black;">Download As...</button>
         <div class="download-options">
@@ -333,7 +344,6 @@ async function fetchAndRenderData() {
         draftHeaders = data.draftHeaders;
         approvalHeaders = data.approvalHeaders;
 
-        // Reverse the sent array to show latest entries first
         loadedData.sent = data.sent.reverse();
 
         const payResponse = await callAppsScript('getPayDataByStatus', ['Ready to Pay', 'Completed', 'Rejected', 'Hold', 'Pending']);
@@ -350,13 +360,44 @@ async function fetchAndRenderData() {
         renderTable('pending', loadedData.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
         renderTable('sent', loadedData.sent, paginationState.sent.currentPage, paginationState.sent.entriesPerPage);
         renderTable('deleted', loadedData.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
-        renderTable('readytopay', loadedData.readytopay, paginationState.readytopay.currentPage, paginationState.readytopay.entriesPerPage);
+        
+        // This function now handles the initial render for the "Ready to Pay" table
+        renderFilteredReadyToPay(); 
+        
         renderTable('approved', loadedData.approved, paginationState.approved.currentPage, paginationState.approved.entriesPerPage);
     } else {
         alert('Failed to load data: ' + data.message);
         ['pending','sent','deleted','readytopay','approved'].forEach(type => document.getElementById(`${type}-loader`).style.display = 'none');
     }
 }
+
+function renderFilteredReadyToPay() {
+    const filterValue = document.getElementById('readytopay-status-filter').value;
+    const allData = loadedData.readytopay || [];
+    let filteredData = allData;
+
+    const approvalCols = ['AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
+
+    if (filterValue === 'Approved') {
+        filteredData = allData.filter(entry => 
+            (entry['Final Approval Status'] || '').toString().toLowerCase() === 'approved'
+        );
+    } else if (filterValue === 'Rejected') {
+        filteredData = allData.filter(entry => 
+            approvalCols.some(col => (entry[col] || '').toString().toLowerCase().includes('rejected'))
+        );
+    } else if (filterValue === 'Pending') {
+        filteredData = allData.filter(entry => {
+            const isRejected = approvalCols.some(col => (entry[col] || '').toString().toLowerCase().includes('rejected'));
+            const isApproved = (entry['Final Approval Status'] || '').toString().toLowerCase() === 'approved';
+            return !isApproved && !isRejected;
+        });
+    }
+
+    paginationState.readytopay.currentPage = 1;
+    renderTable('readytopay', filteredData, 1, paginationState.readytopay.entriesPerPage);
+}
+
 
 async function updateStatus(uniqueId, status) {
     const action = status === 'sent' ? 'send for approval' : 'delete';
@@ -377,7 +418,7 @@ async function updatePayStatusWithRemark(uniqueId, newStatus) {
         let payerRemark = '';
         if (newStatus === 'Pending') {
             payerRemark = prompt("Please enter a remark for this action:");
-            if (payerRemark === null) { // User clicked cancel
+            if (payerRemark === null) {
                 return;
             }
         }
@@ -501,7 +542,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
 
     if(tableType === 'sent') {
         toggleBulkPayButton();
-    } else {
+    } else if (tableType !== 'readytopay') { // Hide bulk button for other tabs
         document.getElementById('bulk-pay-btn').style.display = 'none';
     }
 
@@ -525,7 +566,10 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         const uniqueId = entry['Unique ID'];
         const row = document.createElement('tr');
         
-        row.onclick = () => {
+        row.onclick = (e) => {
+            // Prevent row click from firing when clicking on interactive elements
+            if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+
             if (tableType === 'sent') {
                 openModifyModal(uniqueId, false);
             } else if (tableType === 'readytopay' || tableType === 'approved') {
@@ -601,7 +645,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     const prevButton = document.createElement('button');
     prevButton.textContent = 'Previous';
     prevButton.disabled = currentPage === 1;
-    prevButton.onclick = () => changePage(tableType, currentPage - 1);
+    prevButton.onclick = () => changePage(tableType, currentPage - 1, data); // Pass filtered data
     paginationContainer.appendChild(prevButton);
 
     const pageInfo = document.createElement('span');
@@ -612,7 +656,7 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
     const nextButton = document.createElement('button');
     nextButton.textContent = 'Next';
     nextButton.disabled = currentPage === totalPages;
-    nextButton.onclick = () => changePage(tableType, currentPage + 1);
+    nextButton.onclick = () => changePage(tableType, currentPage + 1, data); // Pass filtered data
     paginationContainer.appendChild(nextButton);
 
     const perPageSelect = document.createElement('select');
@@ -623,20 +667,23 @@ function renderTable(tableType, data, currentPage, entriesPerPage) {
         if (option === entriesPerPage) opt.selected = true;
         perPageSelect.appendChild(opt);
     });
-    perPageSelect.onchange = (e) => changeEntriesPerPage(tableType, parseInt(e.target.value));
+    perPageSelect.onchange = (e) => changeEntriesPerPage(tableType, parseInt(e.target.value), data); // Pass filtered data
     paginationContainer.appendChild(perPageSelect);
 }
 
-function changePage(tableType, newPage) {
+// Modified to accept the data source as an argument for filtering purposes
+function changePage(tableType, newPage, dataSource) {
     paginationState[tableType].currentPage = newPage;
-    renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+    renderTable(tableType, dataSource, newPage, paginationState[tableType].entriesPerPage);
 }
 
-function changeEntriesPerPage(tableType, newEntriesPerPage) {
+// Modified to accept the data source as an argument
+function changeEntriesPerPage(tableType, newEntriesPerPage, dataSource) {
     paginationState[tableType].entriesPerPage = newEntriesPerPage;
     paginationState[tableType].currentPage = 1;
-    renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+    renderTable(tableType, dataSource, 1, newEntriesPerPage);
 }
+
 
 function toggleBulkPayButton() {
     const checkedCount = document.querySelectorAll('#sent-table tbody input[type="checkbox"]:checked').length;
@@ -674,7 +721,12 @@ function initializeColumnSelectors() {
             optionDiv.querySelector('input').addEventListener('change', () => {
                 const newCols = Array.from(dropdown.querySelectorAll('input:checked')).map(cb => cb.value);
                 localStorage.setItem(storageKey, JSON.stringify(newCols));
-                renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+                // When columns change, we need to re-render with the currently active filter
+                if(tableType === 'readytopay') {
+                    renderFilteredReadyToPay();
+                } else {
+                    renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
+                }
             });
             dropdown.appendChild(optionDiv);
         });
@@ -770,8 +822,6 @@ function showLoader() {
     });
 }
 
-// --- NEW DOWNLOAD FUNCTIONS (REPLACES old downloadPdf) ---
-
 function getSelectedDownloadData() {
     const table = document.getElementById('readytopay-table');
     const checkboxes = table.querySelectorAll('tbody input[type="checkbox"]:checked');
@@ -787,10 +837,9 @@ function getSelectedDownloadData() {
     const data = Array.from(checkboxes).map(cb => {
         const row = cb.closest('tr');
         const entry = {};
-        // Start from index 1 to skip checkbox, end before Actions column
         for (let i = 0; i < visibleHeaders.length; i++) {
             const header = visibleHeaders[i];
-            const cell = row.cells[i + 1]; // +1 to offset the checkbox cell
+            const cell = row.cells[i + 1];
             if (cell) {
                 entry[header] = cell.innerText.trim();
             }
@@ -803,7 +852,7 @@ function getSelectedDownloadData() {
 
 function downloadData(format) {
     const selected = getSelectedDownloadData();
-    if (!selected) return; // No data selected
+    if (!selected) return;
 
     switch (format) {
         case 'pdf':
@@ -844,12 +893,11 @@ function downloadAsExcel(data) {
 
 function downloadAsTextCsv(headers, data) {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += headers.join(",") + "\r\n"; // Add header row
+    csvContent += headers.join(",") + "\r\n";
 
     data.forEach(row => {
         let rowArray = headers.map(header => {
             let cell = row[header] || '';
-            // Escape commas by enclosing in double quotes
             return `"${cell.replace(/"/g, '""')}"`; 
         });
         csvContent += rowArray.join(",") + "\r\n";
@@ -863,8 +911,6 @@ function downloadAsTextCsv(headers, data) {
     link.click();
     document.body.removeChild(link);
 }
-
-// --- END NEW DOWNLOAD FUNCTIONS ---
 </script>
 </body>
 </html>
