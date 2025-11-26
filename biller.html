@@ -190,6 +190,47 @@ tbody tr:hover { background-color: #e9ebee; }
 .process-btn:active {
     transform: translateY(1px);
 }
+
+/* Button Base Style */
+.process-btn {
+    background: linear-gradient(135deg, #007bff, #0056b3); /* Subtle gradient */
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15); /* Initial shadow */
+    transition: all 0.3s ease; /* Smooth transition for everything */
+    position: relative;
+    overflow: hidden;
+}
+
+/* Icon transition */
+.process-btn svg {
+    transition: transform 0.3s ease;
+}
+
+/* Hover Effects */
+.process-btn:hover {
+    transform: translateY(-3px); /* Lifts the button up */
+    box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4); /* Glowy shadow underneath */
+    background-color: #004494;
+}
+
+/* Icon rotates and scales on hover */
+.process-btn:hover svg {
+    transform: scale(1.2) rotate(90deg);
+}
+
+/* Click Effect */
+.process-btn:active {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
 /* ----------------------------------------------- */
 
 </style>
