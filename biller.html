@@ -1,5 +1,3 @@
-<!-- V 9.7.0 -->
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -505,7 +503,12 @@ async function updateStatus(uniqueId, status) {
     const action = status === 'sent' ? 'send for approval' : 'delete';
     if (confirm(`Are you sure you want to ${action} this entry?`)) {
         showLoader();
-        const response = await callAppsScript('updateBillerStatus', [uniqueId, status]);
+        // --- AUDIT TRAIL DATA ---
+        const user = localStorage.getItem('approvalName');
+        const role = localStorage.getItem('approvalType');
+        // ------------------------
+
+        const response = await callAppsScript('updateBillerStatus', [uniqueId, status, user, role]);
         if (response.success) {
             fetchAndRenderData();
         } else {
@@ -525,7 +528,14 @@ async function updatePayStatusWithRemark(uniqueId, newStatus) {
             }
         }
         showLoader();
-        const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, payerRemark]);
+        // --- AUDIT TRAIL DATA ---
+        const user = localStorage.getItem('approvalName');
+        const role = localStorage.getItem('approvalType');
+        // ------------------------
+
+        // Pass user and role at the end. Empty strings for amount/txn/link as this isn't completing payment.
+        const response = await callAppsScript('updatePayStatus', [uniqueId, newStatus, payerRemark, "", "", "", user, role]);
+        
         if (response.success) {
             alert(response.message);
             fetchAndRenderData();
@@ -547,7 +557,12 @@ async function sendMultipleToPay() {
 
     if (confirm(`Are you sure you want to send ${uniqueIds.length} approved entr${uniqueIds.length === 1 ? 'y' : 'ies'} to the 'Ready to Pay' list?`)) {
         showLoader();
-        const response = await callAppsScript('moveMultipleToPaySheet', [uniqueIds]);
+        // --- AUDIT TRAIL DATA ---
+        const user = localStorage.getItem('approvalName');
+        const role = localStorage.getItem('approvalType');
+        // ------------------------
+        
+        const response = await callAppsScript('moveMultipleToPaySheet', [uniqueIds, user, role]);
         
         if (response.success) {
             alert(response.message);
@@ -562,7 +577,13 @@ async function sendMultipleToPay() {
 async function addInPay(uniqueId) {
     if (confirm(`Are you sure you want to add this approved entry to the 'Ready to Pay' list?`)) {
         showLoader();
-        const response = await callAppsScript('moveMultipleToPaySheet', [[uniqueId]]);
+        // --- AUDIT TRAIL DATA ---
+        const user = localStorage.getItem('approvalName');
+        const role = localStorage.getItem('approvalType');
+        // ------------------------
+
+        // Pass array of IDs (even if single)
+        const response = await callAppsScript('moveMultipleToPaySheet', [[uniqueId], user, role]);
         
         if (response.success) {
             alert(response.message);
@@ -579,7 +600,13 @@ document.getElementById('modify-form').addEventListener('submit', async function
     const updatedEntry = Object.fromEntries(new FormData(e.target).entries());
     closeModal('modify-modal');
     showLoader();
-    const response = await callAppsScript('updateBillerEntry', [updatedEntry]);
+    
+    // --- AUDIT TRAIL DATA ---
+    const user = localStorage.getItem('approvalName');
+    const role = localStorage.getItem('approvalType');
+    // ------------------------
+
+    const response = await callAppsScript('updateBillerEntry', [updatedEntry, user, role]);
     if (response.success) {
         fetchAndRenderData();
     } else {
@@ -923,7 +950,7 @@ function showLoader() {
 }
 
 // ============================================
-// UPDATED DOWNLOAD FUNCTION FOR DIRECT DOWNLOAD
+// DOWNLOAD FUNCTION
 // ============================================
 
 function getSelectedDownloadData(tableId) {
