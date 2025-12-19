@@ -385,9 +385,15 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJUyYMUqE29p594h6WH
 let loadedData = {};
 let draftHeaders = [];
 let approvalHeaders = [];
-const DEFAULT_COLS_DRAFT = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable'];
-const DEFAULT_COLS_SENT = ['Unique ID', 'Vendor', 'FinalAmountPayable', 'AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
-const DEFAULT_COLS_READYTOPAY = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status', 'Payer Remark'];
+// const DEFAULT_COLS_DRAFT = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable'];
+// const DEFAULT_COLS_SENT = ['Unique ID', 'Vendor', 'FinalAmountPayable', 'AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
+// Isme 'Uploaded At' add kiya hai starting mein
+const DEFAULT_COLS_DRAFT = ['Uploaded At', 'Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable'];
+
+// Isme bhi 'Uploaded At' add kiya hai
+const DEFAULT_COLS_SENT = ['Uploaded At', 'Unique ID', 'Vendor', 'FinalAmountPayable', 'AccountantApproval', 'CFOApproval', 'HOD Approval Status', 'Final Approval Status'];
+    
+    const DEFAULT_COLS_READYTOPAY = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status', 'Payer Remark'];
 const DEFAULT_COLS_APPROVED = ['Unique ID', 'Vendor', 'InvoiceNumber', 'FinalAmountPayable', 'Final Approval Status', 'Pay Status'];
 
 const paginationState = {
