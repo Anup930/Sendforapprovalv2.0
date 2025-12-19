@@ -1,3 +1,5 @@
+<!-- V 9.7.0 -->
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -296,6 +298,7 @@ tbody tr:hover { background-color: #e9ebee; }
             <a href="#" onclick="downloadData('text', 'sent-table')">Text (.csv)</a>
         </div>
     </div>
+
     <button id="bulk-pay-btn" class="action-btn" onclick="sendMultipleToPay()" style="display:none;">Add Selected to Pay</button>
     <div class="column-selector" id="sent-selector"></div>
     <div id="sent-pagination" class="pagination-controls" style="display:none;"></div>
@@ -459,7 +462,7 @@ async function fetchAndRenderData() {
         initializeColumnSelectors();
         renderTable('pending', loadedData.pending, paginationState.pending.currentPage, paginationState.pending.entriesPerPage);
         
-        renderFilteredSentData(); // Use filter for the "Sent" table
+        renderFilteredSentData(); 
         
         renderTable('deleted', loadedData.deleted, paginationState.deleted.currentPage, paginationState.deleted.entriesPerPage);
         renderTable('readytopay', loadedData.readytopay, paginationState.readytopay.currentPage, paginationState.readytopay.entriesPerPage);
@@ -470,7 +473,6 @@ async function fetchAndRenderData() {
     }
 }
 
-// NEW function for filtering the SENT table
 function renderFilteredSentData() {
     const filterValue = document.getElementById('sent-status-filter').value;
     const allData = loadedData.sent || [];
@@ -821,7 +823,7 @@ function initializeColumnSelectors() {
                 localStorage.setItem(storageKey, JSON.stringify(newCols));
                 
                 if(tableType === 'sent') {
-                    renderFilteredSentData(); // Re-render with filter
+                    renderFilteredSentData(); 
                 } else {
                     renderTable(tableType, loadedData[tableType], paginationState[tableType].currentPage, paginationState[tableType].entriesPerPage);
                 }
@@ -920,34 +922,55 @@ function showLoader() {
     });
 }
 
-// UPDATED DOWNLOAD FUNCTIONS TO ACCEPT TABLE ID
+// ============================================
+// UPDATED DOWNLOAD FUNCTION FOR DIRECT DOWNLOAD
+// ============================================
 
 function getSelectedDownloadData(tableId) {
     const table = document.getElementById(tableId);
     if (!table) return null;
     
-    const checkboxes = table.querySelectorAll('tbody input[type="checkbox"]:checked');
-    
-    if (checkboxes.length === 0) {
-        alert("Please select at least one entry to download.");
+    // 1. Check for selected checkboxes first
+    let rowsToDownload = table.querySelectorAll('tbody input[type="checkbox"]:checked');
+    let useAllRows = false;
+
+    // 2. If nothing selected, default to ALL visible rows
+    if (rowsToDownload.length === 0) {
+        rowsToDownload = table.querySelectorAll('tbody tr');
+        useAllRows = true;
+    }
+
+    if (rowsToDownload.length === 0) {
+        alert("No data available to download.");
         return null;
     }
 
-    const allHeaders = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
-    // Filter out empty headers or Actions column or Checkbox column if it reads empty
-    const visibleHeaders = allHeaders.filter(header => header !== '' && header !== 'Actions');
+    // 3. Robust Header & Data Extraction
+    const allHeaders = Array.from(table.querySelectorAll('thead th'));
+    const visibleHeadersIndices = [];
+    const visibleHeaders = [];
+
+    allHeaders.forEach((th, index) => {
+        const text = th.innerText.trim();
+        // Skip empty headers (like checkboxes) and 'Actions'
+        if (text !== '' && text !== 'Actions') {
+            visibleHeaders.push(text);
+            visibleHeadersIndices.push(index);
+        }
+    });
     
-    const data = Array.from(checkboxes).map(cb => {
-        const row = cb.closest('tr');
+    const data = Array.from(rowsToDownload).map(node => {
+        // If checkboxes used, node is Input. If all rows used, node is TR.
+        const row = useAllRows ? node : node.closest('tr');
+        
         const entry = {};
-        // Start loop from 1 to skip checkbox column
-        for (let i = 0; i < visibleHeaders.length; i++) {
+        visibleHeadersIndices.forEach((colIndex, i) => {
             const header = visibleHeaders[i];
-            const cell = row.cells[i + 1]; 
+            const cell = row.cells[colIndex];
             if (cell) {
                 entry[header] = cell.innerText.trim();
             }
-        }
+        });
         return entry;
     });
 
