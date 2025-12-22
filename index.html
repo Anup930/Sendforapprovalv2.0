@@ -1,5 +1,4 @@
-<!-- https://script.google.com/macros/s/AKfycbxJUyYMUqE29p594h6WHnh7OIuiw7g69J3OdTaJRrN9wYTDv3OQPQeGIdE6HDkItQLy7A/exec -->
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <base target="_top">
@@ -36,23 +35,18 @@ button:disabled { background-color: #4a5568; cursor: not-allowed; }
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxJUyYMUqE29p594h6WHnh7OIuiw7g69J3OdTaJRrN9wYTDv3OQPQeGIdE6HDkItQLy7A/exec";
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Check if user is already logged in
     const userType = localStorage.getItem('approvalType');
     if (userType) {
-        // Redirect based on stored user type
         if (userType === 'Payer') {
             window.location.href = 'Payer.html';
         } else {
             window.location.href = 'biller.html';
         }
-        return; // Stop further execution
     }
 });
 
 function handleKey(event) {
-    if (event.keyCode === 13) {
-        login();
-    }
+    if (event.keyCode === 13) login();
 }
 
 function login() {
@@ -77,11 +71,8 @@ function login() {
     .then(res => res.json())
     .then(response => {
         if (response.success) {
-            // Save user info and type in local storage
             localStorage.setItem('approvalType', response.approvalType);
             localStorage.setItem('approvalName', response.approvalName);
-
-            // Redirect based on the returned user type
             if (response.approvalType === 'Payer') {
                 window.location.href = 'Payer.html';
             } else {
@@ -94,7 +85,7 @@ function login() {
         }
     })
     .catch(error => {
-        messageEl.textContent = "An network error occurred: " + error.message;
+        messageEl.textContent = "Network error: " + error.message;
         loginButton.textContent = "Log In";
         loginButton.disabled = false;
     });
