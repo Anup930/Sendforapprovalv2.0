@@ -1,0 +1,127 @@
+<style>
+    /* Scanner Specific Styles to match Dashboard */
+    .scanner-container {
+        background: #fff;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        max-width: 900px;
+        margin: 0 auto;
+    }
+    .scanner-step { margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
+    .scanner-step h3 { color: #2c3e50; margin-bottom: 15px; }
+    
+    .file-drop-area {
+        border: 2px dashed #3b82f6;
+        border-radius: 8px;
+        padding: 30px;
+        text-align: center;
+        background: #f0f9ff;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    .file-drop-area:hover { background: #e0f2fe; }
+    
+    .manual-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+    .form-group label { display: block; font-size: 14px; color: #666; margin-bottom: 5px; font-weight: 600; }
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    /* Scanner Buttons */
+    .scan-btn-group { display: flex; gap: 10px; margin-top: 20px; }
+    .btn-ai { background: linear-gradient(135deg, #8b5cf6, #6d28d9); color: white; }
+    .btn-ai:hover { background: #5b21b6; }
+    
+    /* Loading Spinner for Scanner */
+    .scan-loader {
+        display: none;
+        text-align: center;
+        margin-top: 20px;
+        font-weight: bold;
+        color: #3b82f6;
+    }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/build/pdf.min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+
+<div id="scanner-section" class="content-section">
+    <div class="dashboard-top-bar">
+        <h1>Process New Invoice (AI Scanner)</h1>
+        <button onclick="showSection('pending')" class="action-btn" style="background:#6c757d;">&larr; Back to Dashboard</button>
+    </div>
+
+    <div class="scanner-container">
+        
+        <div class="scanner-step">
+            <h3>1. Upload Invoice (PDF)</h3>
+            <div class="file-drop-area">
+                <input type="file" id="scanner-pdf-upload" accept=".pdf" style="display: none;" onchange="handleFileUpload(this)">
+                <label for="scanner-pdf-upload" style="cursor: pointer;">
+                    <p style="font-size: 1.2em; color: #3b82f6;">Click to Upload PDF</p>
+                    <p id="file-name-display" style="color: #666; margin-top: 5px;">No file selected</p>
+                </label>
+            </div>
+            <textarea id="scanner-extracted-text" style="display:none;"></textarea> </div>
+
+        <div class="scanner-step">
+            <h3>2. Basic Details</h3>
+            <div class="manual-grid">
+                <div class="form-group">
+                    <label>Invoice Received Date *</label>
+                    <input type="date" id="scan-invoice-date">
+                </div>
+                <div class="form-group">
+                    <label>Bill Source</label>
+                    <select id="scan-source">
+                        <option value="Whatsapp">Whatsapp</option>
+                        <option value="Mail">Mail</option>
+                        <option value="Hard Copy">Hard Copy</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Bill Given By *</label>
+                    <input type="text" id="scan-given-by" placeholder="Person Name">
+                </div>
+                <div class="form-group">
+                    <label>Added By (You)</label>
+                    <input type="text" id="scan-added-by" readonly style="background-color: #f3f4f6;">
+                </div>
+                <div class="form-group">
+                    <label>HOD for Approval</label>
+                    <select id="scan-hod">
+                         <option value="Arvind Harlalka">Arvind Harlalka</option>
+                        <option value="Alok Harlalka">Alok Harlalka</option>
+                        <option value="Sumeet Harlalka">Sumeet Harlalka</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Final Approval</label>
+                    <select id="scan-final">
+                        <option value="Arvind Harlalka">Arvind Harlalka</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="scan-btn-group">
+            <button id="btn-extract-analyze" class="process-btn btn-ai" onclick="processWithAI()" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path></svg>
+                Extract Data & Verify
+            </button>
+        </div>
+
+        <div id="scanner-loader" class="scan-loader">
+            <div class="spinner" style="display:inline-block; width: 20px; height: 20px; border: 3px solid #ccc; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <span id="scan-status-text">Processing PDF...</span>
+        </div>
+
+    </div>
+</div>
